@@ -3,7 +3,12 @@
 ## 1. 项目说明
 本项目是一个古籍整理系统，包含前端静态页面与 Node.js 后端服务：
 - 前端负责图片/PDF 导入、标注编辑、造字、XML 导出、项目管理。
-- 后端负责用户鉴权、项目快照存储、造字存储、导出文件存储、OCR 接口转发、多人协同通信。
+
+- 后端负责用户鉴权、项目快照存储、造字存储、导出文件存储、OCR 接口转发、多人协同通信。![image-20260409173021947](C:\Users\25283\AppData\Roaming\Typora\typora-user-images\image-20260409173021947.png)
+
+  ![image-20260409173235070](C:\Users\25283\AppData\Roaming\Typora\typora-user-images\image-20260409173235070.png)
+
+  ![image-20260409173518526](C:\Users\25283\AppData\Roaming\Typora\typora-user-images\image-20260409173518526.png)
 
 ## 2. 前后端项目结构（树结构）
 
