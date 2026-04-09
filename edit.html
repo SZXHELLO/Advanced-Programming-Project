@@ -1,0 +1,3263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>古籍编辑 | SDOC Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        /* 编辑页特有样式 */
+        .edit-layout {
+            display: flex;
+            height: calc(100vh - 56px - 32px);
+        }
+
+        /* 左侧面板 */
+        .edit-left-panel {
+            width: 260px;
+            background: #fff;
+            border-right: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-section {
+            padding: var(--space-sm);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .panel-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .panel-title svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-cinnabar);
+        }
+
+        .project-actions {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .project-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            padding: var(--space-xs) var(--space-sm);
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+            width: 100%;
+            text-align: left;
+        }
+
+        .project-btn:hover {
+            background: #EDE8E0;
+            border-color: var(--color-azurite);
+        }
+
+        .project-btn svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-azurite);
+        }
+
+        .thumbnail-list {
+            flex: 1;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: var(--space-xs);
+            overflow-y: auto;
+            padding: var(--space-xs);
+        }
+
+        .thumbnail-item {
+            position: relative;
+            width: 100%;
+            height: auto;
+            flex: 0 0 auto;
+            margin-bottom: 0;
+            border: 2px solid transparent;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .thumbnail-item:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .thumbnail-item.active {
+            border-color: var(--color-cinnabar);
+            box-shadow: 0 0 0 2px rgba(200, 74, 50, 0.2);
+        }
+
+        .thumbnail-item img {
+            width: 100%;
+            display: block;
+            height: auto;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        .thumbnail-page {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
+
+        .thumbnail-delete {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(200, 74, 50, 0.9);
+            color: white;
+            border: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .thumbnail-item:hover .thumbnail-delete {
+            opacity: 1;
+        }
+
+        /* 主编辑区域 */
+        .edit-main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #E8E4DC;
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            background: #fff;
+            padding: var(--space-xs) var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .page-nav {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .page-nav-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+        }
+
+        .page-nav-btn:hover:not(:disabled) {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .page-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-nav-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .page-indicator {
+            font-size: 12px;
+            color: var(--color-text);
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            margin-left: auto;
+        }
+
+        .zoom-value {
+            font-size: 12px;
+            color: var(--color-text-light);
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .collab-leave-btn {
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.9);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            display: none;
+        }
+
+        .collab-leave-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        /* 画布容器 */
+        .canvas-container {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-md);
+            position: relative;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            background: #fff;
+            box-shadow: var(--shadow-lg);
+            transform-origin: center center;
+        }
+
+        #mainCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #annotationLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        #interactionLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+        }
+
+        /* 右侧面板 */
+        .edit-right-panel {
+            width: 300px;
+            background: #fff;
+            border-left: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .property-section {
+            padding: var(--space-sm);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .property-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-ink);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            margin-bottom: var(--space-sm);
+        }
+
+        .property-title svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-cinnabar);
+        }
+
+        .mark-type-selector {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .mark-type-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: var(--space-xs);
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 10px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .mark-type-btn:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .mark-type-btn.active {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .mark-type-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* 属性类型选择器 */
+        .attr-type-selector {
+            display: flex;
+            gap: var(--space-xs);
+            margin-top: var(--space-sm);
+        }
+
+        .attr-type-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: var(--space-xs);
+            background: var(--color-paper);
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .attr-type-btn:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .attr-type-btn.active {
+            color: white;
+            border-color: transparent;
+        }
+
+        .attr-type-btn[data-type="字"].active {
+            background: var(--mark-red);
+        }
+
+        .attr-type-btn[data-type="词"].active {
+            background: var(--mark-blue);
+        }
+
+        .attr-type-btn[data-type="句子"].active {
+            background: var(--mark-green);
+        }
+
+        .attr-type-btn[data-type="标题"].active {
+            background: var(--mark-orange);
+        }
+
+        .attr-type-btn[data-type="删除"].active {
+            background: #7A7A7A;
+        }
+
+        .attr-type-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-bottom: 2px;
+        }
+
+        .annotation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-xs);
+        }
+
+        .annotation-card {
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: var(--space-sm);
+            margin-bottom: var(--space-xs);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .annotation-card:hover {
+            border-color: var(--color-azurite);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .annotation-card.selected {
+            border-color: var(--color-cinnabar);
+            background: #FDF8F7;
+        }
+
+        .annotation-preview {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .annotation-char {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 20px;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .annotation-info {
+            flex: 1;
+        }
+
+        .annotation-simplified {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-ink);
+            margin-bottom: 2px;
+        }
+
+        .annotation-type {
+            font-size: 10px;
+            color: var(--color-text-light);
+        }
+
+        .annotation-actions {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .annotation-action-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text-light);
+            transition: all var(--transition-fast);
+        }
+
+        .annotation-action-btn:hover {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .annotation-action-btn.delete:hover {
+            background: var(--color-cinnabar);
+            border-color: var(--color-cinnabar);
+        }
+
+        .annotation-action-btn svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* 造字区 */
+        .custom-chars-section {
+            max-height: 180px;
+            overflow: auto;
+            border-top: 1px solid var(--color-border);
+            padding: var(--space-sm);
+        }
+
+        .custom-chars-grid {
+
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .custom-char-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 20px;
+            font-family: 'Noto Serif SC', serif;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .custom-char-delete {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(200, 74, 50, 0.9);
+            color: white;
+            border: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .custom-char-item:hover {
+            border-color: var(--color-azurite);
+            background: #fff;
+        }
+
+        .custom-char-item:hover .custom-char-delete {
+            opacity: 1;
+        }
+
+        .custom-char-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 导航栏 -->
+    <header class="top-nav">
+        <a href="index.html" class="nav-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            <span>古籍编辑器</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                </svg>
+                首页
+            </a>
+            <a href="edit.html" class="nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                编辑
+            </a>
+            <a href="project.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                    <line x1="7" y1="16" x2="13" y2="16"></line>
+                </svg>
+                项目
+            </a>
+            <a href="createChar.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                </svg>
+                造字
+            </a>
+            <!-- <a href="exportXml.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                导出
+            </a> -->
+
+            <a onclick="handleExportXML()" class="nav-link" style="cursor: pointer;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                导出
+            </a>
+
+
+            <a href="upload.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                上传
+            </a>
+        </div>
+        <div class="nav-spacer"></div>
+        <button class="btn btn-secondary" onclick="document.getElementById('importImageInput').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            导入
+        </button>
+        <button class="btn btn-primary" onclick="saveProject()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            保存
+        </button>
+    </header>
+
+    <!-- 主编辑区 -->
+    <div class="edit-layout">
+        <!-- 左侧面板 -->
+        <aside class="edit-left-panel">
+            <div class="panel-section">
+                <h3 class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    项目
+                </h3>
+                <div class="project-actions">
+                    <button class="project-btn" onclick="createNewProject()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                        项目信息
+                    </button>
+                    <button class="project-btn" onclick="document.getElementById('openProjectInput').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                            </path>
+                        </svg>
+                        打开
+                    </button>
+                    <!-- <button class="project-btn" onclick="window.location.href='exportXml.html'"> -->
+                    <button class="project-btn" onclick="handleExportXML() ">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        导出XML
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel-section" style="padding-bottom: 0;">
+                <h3 class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    页面
+                </h3>
+            </div>
+            <div class="thumbnail-list" id="thumbnailList"></div>
+        </aside>
+
+        <!-- 主编辑区域 -->
+        <main class="edit-main-area">
+            <div class="editor-toolbar">
+                <div class="tool-group">
+                    <button class="tool-btn active" id="selectTool" data-tooltip="选择" onclick="setTool('select')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="boxTool" data-tooltip="框选" onclick="setTool('box')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="1.5" y="1.5" width="21" height="21" rx="2" ry="2"></rect>
+                            <text x="50%" y="51%" dominant-baseline="central" text-anchor="middle"
+                                font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                                font-size="16" font-weight="100" fill="currentColor">A</text>
+                        </svg>
+                    </button>
+                    <!-- 新增AI识别文字按钮 -->
+                    <button class="tool-btn" data-tooltip="AI识别文字" onclick="aiRecognizeText()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 7V2H7" />
+                                <path d="M17 2H22V7" />
+                                <path d="M2 17V22H7" />
+                                <path d="M17 22H22V17" />
+                            </g>
+
+                            <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle"
+                                font-family="Arial, sans-serif" font-size="7" font-weight="900" fill="currentColor"
+                                style="letter-spacing: -0.5px;">OCR</text>
+                        </svg>
+                    </button>
+
+                    <button class="tool-btn" id="lassoTool" data-tooltip="套索" onclick="setTool('lasso')">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <!-- 只平移方框 -->
+                            <g id="lassoBox" transform="translate(2.2 2.2)">
+                                <rect x="2.5" y="2.5" width="15" height="15" rx="2" stroke="currentColor"
+                                    stroke-width="2" stroke-dasharray="1.6 3.2" stroke-linecap="round" />
+                            </g>
+
+                            <!-- 鼠标箭头保持不动 -->
+                            <path d="M11.5 10.5l3.2 8.2 1.9-3.1 3.7-1.3-8.8-3.8z" fill="currentColor" />
+                        </svg>
+                    </button>
+
+
+
+
+                    <!-- 新增AI划分图文区域按钮 -->
+                    <!-- <button class="tool-btn" data-tooltip="AI划分" onclick="aiRecognizeText()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 6 L22 6" />
+                                <path d="M2 18 L22 18" />
+                                <path d="M6 2 L6 22" />
+                                <path d="M18 2 L18 22" />
+                            </g>
+
+                            <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle"
+                                font-family="Arial, Helvetica, sans-serif" font-size="8.5" font-weight="bold"
+                                fill="currentColor">AI</text>
+                        </svg>
+                    </button> -->
+
+                    <!-- <button class="tool-btn" id="underlineTool" data-tooltip="下划线" onclick="setTool('underline')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path>
+                            <line x1="4" y1="21" x2="20" y2="21"></line>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="highlightTool" data-tooltip="高亮" onclick="setTool('highlight')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="strikethroughTool" data-tooltip="删除线"
+                        onclick="setTool('strikethrough')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="4" y1="12" x2="20" y2="12"></line>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="slashTool" data-tooltip="斜线" onclick="setTool('slash')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="19" x2="19" y2="5"></line>
+                        </svg>
+                    </button> -->
+                </div>
+
+                <div class="tool-group">
+                    <button class="tool-btn" data-tooltip="撤销" onclick="undoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 7v6h6"></path>
+                            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tooltip="重做" onclick="redoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 7v6h-6"></path>
+                            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="page-nav">
+                    <button class="page-nav-btn" onclick="goToFirstPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="11 17 6 12 11 7"></polyline>
+                            <polyline points="18 17 13 12 18 7"></polyline>
+                        </svg>
+                    </button>
+                    <button class="page-nav-btn" onclick="goToPrevPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <span class="page-indicator" id="pageIndicator">1 / 1</span>
+                    <button class="page-nav-btn" onclick="goToNextPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                    <button class="page-nav-btn" onclick="goToLastPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="13 17 18 12 13 7"></polyline>
+                            <polyline points="6 17 11 12 6 7"></polyline>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="zoom-controls">
+                    <button class="tool-btn" onclick="zoomOut()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                    <span class="zoom-value" id="zoomValue">100%</span>
+                    <button class="tool-btn" onclick="zoomIn()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="11" y1="8" x2="11" y2="14"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 画布区域 -->
+            <div class="canvas-container" id="canvasContainer">
+                <div class="empty-state" id="emptyState">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    <h3>欢迎使用古籍编辑器</h3>
+                    <p>请新建项目或导入古籍图片开始编辑</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('importImageInput').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"
+                            height="14">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        导入图片或PDF
+                    </button>
+                </div>
+                <div class="canvas-wrapper" id="canvasWrapper" style="display: none;">
+                    <canvas id="mainCanvas"></canvas>
+                    <canvas id="annotationLayer"></canvas>
+                    <canvas id="interactionLayer"></canvas>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧面板 -->
+        <aside class="edit-right-panel">
+            <div class="property-section">
+                <h3 class="property-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    属性编辑
+                </h3>
+
+                <div class="form-group" style="margin-bottom: var(--space-xs);">
+                    <label class="form-label">简体字</label>
+                    <input type="text" class="form-input" id="simplifiedCharInput" placeholder="输入简体字"
+                        style="font-size: 13px; padding: 6px 10px;" oninput="updateAnnotationSimplified(this.value)">
+                </div>
+
+                <div class="form-group" style="margin-bottom: var(--space-xs);">
+                    <label class="form-label">颜色</label>
+                    <div class="color-picker-group" id="colorPicker">
+                        <div class="color-swatch selected" style="background: #C84A32;" data-color="#C84A32"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #2B5F8E;" data-color="#2B5F8E"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #5B8C5A;" data-color="#5B8C5A"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #E8C547;" data-color="#E8C547"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #7B5BA6;" data-color="#7B5BA6"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #D67B3C;" data-color="#D67B3C"
+                            onclick="selectColor(this)"></div>
+                    </div>
+                </div>
+
+                <!-- <div class="form-group" style="margin-bottom: var(--space-xs);">
+                    <label class="form-label">标注样式</label>
+                    <div class="mark-type-selector" id="markTypeSelector">
+                        <button class="mark-type-btn active" data-type="box" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            </svg>
+                            框选
+                        </button>
+                        <button class="mark-type-btn" data-type="underline" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path>
+                                <line x1="4" y1="21" x2="20" y2="21"></line>
+                            </svg>
+                            下划线
+                        </button>
+                        <button class="mark-type-btn" data-type="highlight" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            高亮
+                        </button>
+                        <button class="mark-type-btn" data-type="strikethrough" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="4" y1="12" x2="20" y2="12"></line>
+                            </svg>
+                            删除线
+                        </button>
+                    </div>
+                </div> -->
+
+                <!-- 属性类型选择器（仅框选标注显示） -->
+                <div class="form-group" id="attrTypeContainer" style="display: none;">
+                    <label class="form-label">属性类型</label>
+                    <div class="attr-type-selector" id="boxAttrTypeSelector">
+                        <button class="attr-type-btn active" data-type="字" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-red);"></span>
+                            字
+                        </button>
+                        <button class="attr-type-btn" data-type="词" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-blue);"></span>
+                            词
+                        </button>
+                        <button class="attr-type-btn" data-type="句子" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-green);"></span>
+                            句子
+                        </button>
+                        <button class="attr-type-btn" data-type="标题" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-orange);"></span>
+                            标题
+                        </button>
+                    </div>
+                    <div class="attr-type-selector" id="lassoAttrTypeSelector" style="display: none;">
+                        <button class="attr-type-btn active" data-type="词" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-blue);"></span>
+                            词
+                        </button>
+                        <button class="attr-type-btn" data-type="句子" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-green);"></span>
+                            句子
+                        </button>
+                        <button class="attr-type-btn" data-type="标题" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-orange);"></span>
+                            标题
+                        </button>
+                        <button class="attr-type-btn" data-type="删除" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: #7A7A7A;"></span>
+                            删除
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">注释</label>
+                    <textarea class="form-input" id="annotationNoteInput" placeholder="输入注释"
+                        style="font-size: 12px; padding: 6px 10px; min-height: 50px;"
+                        oninput="updateAnnotationNote(this.value)"></textarea>
+                </div>
+            </div>
+
+            <div class="property-section"
+                style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 0;">
+                <h3 class="property-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    标注
+                    <span style="margin-left: auto; font-size: 11px; color: var(--color-text-light);"
+                        id="annotationCount">0条</span>
+                </h3>
+                <div class="annotation-list" id="annotationList"></div>
+            </div>
+
+            <div class="custom-chars-section">
+                <h3 class="property-title" style="cursor: pointer;" onclick="window.location.href='createChar.html'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    造字
+                    <span style="margin-left: auto; font-size: 11px; color: var(--color-text-light);"
+                        id="customCharCount">0个</span>
+                </h3>
+                <div class="custom-chars-grid" id="customCharsGrid"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="statusbar">
+        <div class="status-item">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">就绪</span>
+        </div>
+        <div class="status-item">
+            <span>页:</span>
+            <span id="statusPage">-</span>
+        </div>
+        <div class="status-item">
+            <span>标:</span>
+            <span id="statusAnnotations">0</span>
+        </div>
+        <div class="status-item">
+            <span>缩放:</span>
+            <span id="statusZoom">100%</span>
+        </div>
+        <div class="status-item">
+            <span id="statusCollab">多人编辑未开启</span>
+            <button id="collabLeaveBtn" class="collab-leave-btn" type="button">退出多人编辑</button>
+        </div>
+    </footer>
+
+    <!-- 新建项目模态框 -->
+    <div class="modal-overlay" id="projectModal">
+        <div class="modal" style="width: 450px;">
+            <div class="modal-header">
+                <h2 class="modal-title">项目信息</h2>
+                <button class="modal-close" onclick="closeModal('projectModal')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">项目标题 *</label>
+                    <input type="text" class="form-input" id="projectTitle" placeholder="请输入项目标题">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">书籍</label>
+                        <input type="text" class="form-input" id="projectBook" placeholder="书籍名">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">卷/期</label>
+                        <input type="text" class="form-input" id="projectVolume" placeholder="如：卷一">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">作者</label>
+                        <input type="text" class="form-input" id="projectAuthor" placeholder="作者">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">朝代</label>
+                        <input type="text" class="form-input" id="projectDynasty" placeholder="如：唐">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('projectModal')">取消</button>
+                <button class="btn btn-primary" onclick="confirmNewProject()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF 页码范围模态框 -->
+    <div class="modal-overlay" id="pdfRangeModal" onclick="if(event.target===this){cancelPdfRangeSelection();}">
+        <div class="modal" style="width: 420px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="pdfRangeModalTitle">导入 PDF 页码范围</h2>
+                <button class="modal-close" onclick="cancelPdfRangeSelection()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">页码范围</label>
+                    <input type="text" class="form-input" id="pdfPageRangeInput" placeholder="示例：1,3,5-8（留空导入全部）"
+                        onkeydown="if(event.key==='Enter'){confirmPdfRangeSelection();}">
+                    <div id="pdfTotalPagesHint"
+                        style="margin-top: 6px; font-size: 11px; color: var(--color-text-light);">总页数：-</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="cancelPdfRangeSelection()">取消</button>
+                <button class="btn btn-primary" onclick="confirmPdfRangeSelection()">确认导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" id="importImageInput" class="hidden-input"
+        accept="image/jpeg,image/png,image/webp,application/pdf" multiple onchange="handleImageImport(event)">
+    <input type="file" id="openProjectInput" class="hidden-input" accept=".json,.sdocproj"
+        onchange="handleProjectOpen(event)">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/common.js"></script>
+    <script>
+        // ===== 编辑页状态 =====
+        let mainCanvas, annotationCanvas, interactionCanvas;
+        let mainCtx, annotationCtx, interactionCtx;
+        let selectedAnnotation = null;
+        let currentTool = 'select';
+        let currentColor = '#C84A32';
+        let currentMarkType = 'box';
+        let currentAttrType = '字';  // 属性类型：字/词/句子
+        let defaultNewBoxAttr = '字';
+        let defaultLassoAction = '词';
+        let zoom = 1;
+        let isDrawing = false;
+        let startX, startY;
+        let currentRect = null;
+        let slashStartX, slashStartY;  // 斜线绘制起点
+        let currentSlashPreview = null;
+        let undoStack = [];
+        let redoStack = [];
+        let pdfRangeResolver = null;
+        let pdfRangeTotalPages = 0;
+        const COLLAB_KEYS = {
+            enabled: 'sdoc_collab_enabled',
+            projectId: 'sdoc_collab_project_id',
+            onlineHint: 'sdoc_collab_online_hint'
+        };
+        let collabEnabled = false;
+        let collabWs = null;
+        let collabOnlineCount = 1;
+        let collabProjectId = '';
+        let collabSessionId = '';
+        let collabDisplayName = '';
+        let collabRemoteDrawings = new Map();
+        let collabLastPreviewSentAt = 0;
+        let collabLastReplaceVersion = 0;
+        let collabLastPagesReplaceVersion = 0;
+        let collabLastPageSyncVersion = 0;
+        let collabLastPageSyncRequestAt = 0;
+        let collabReconnectTimer = null;
+        let collabStatusPollTimer = null;
+        const COLLAB_PREVIEW_THROTTLE_MS = 60;
+        const COLLAB_PAGE_SYNC_THROTTLE_MS = 200;
+        const COLLAB_PAGE_SYNC_DEBUG = false;
+        const PDF_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
+        }
+        const API_BASE = window.SDOC_API_BASE || "http://localhost:8000";
+
+        // ===== 初始化 =====
+        function init() {
+            mainCanvas = document.getElementById('mainCanvas');
+            annotationCanvas = document.getElementById('annotationLayer');
+            interactionCanvas = document.getElementById('interactionLayer');
+
+            if (mainCanvas && annotationCanvas && interactionCanvas) {
+                mainCtx = mainCanvas.getContext('2d');
+                annotationCtx = annotationCanvas.getContext('2d');
+                interactionCtx = interactionCanvas.getContext('2d');
+
+                setupEventListeners();
+                updateUI();
+                initCollab();
+            }
+        }
+
+        // ===== 事件监听 =====
+        function setupEventListeners() {
+            interactionCanvas.addEventListener('mousedown', handleCanvasMouseDown);
+            interactionCanvas.addEventListener('mousemove', handleCanvasMouseMove);
+            interactionCanvas.addEventListener('mouseup', handleCanvasMouseUp);
+            interactionCanvas.addEventListener('mouseleave', handleCanvasMouseUp);
+
+            document.getElementById('canvasContainer').addEventListener('wheel', handleWheelZoom);
+            const leaveBtn = document.getElementById('collabLeaveBtn');
+            if (leaveBtn) {
+                leaveBtn.addEventListener('click', leaveCollabMode);
+            }
+            window.addEventListener('beforeunload', leaveCollabOnPageExit);
+            window.addEventListener('pagehide', leaveCollabOnPageExit);
+        }
+
+        function toWsBaseUrl(apiBase) {
+            if (!apiBase) return '';
+            if (apiBase.startsWith('https://')) return apiBase.replace('https://', 'wss://');
+            if (apiBase.startsWith('http://')) return apiBase.replace('http://', 'ws://');
+            return apiBase;
+        }
+
+        function setCollabStatus(text, enabled) {
+            const node = document.getElementById('statusCollab');
+            const leaveBtn = document.getElementById('collabLeaveBtn');
+            if (node) {
+                node.textContent = text;
+            }
+            if (leaveBtn) {
+                leaveBtn.style.display = enabled ? 'inline-flex' : 'none';
+            }
+        }
+
+        function getCollabStatusText(count) {
+            const safeCount = Number.isFinite(Number(count)) ? Number(count) : 1;
+            if (safeCount <= 1) {
+                return '单人编辑';
+            }
+            return `开启多人编辑：${safeCount}`;
+        }
+
+        function clearCollabTimers() {
+            if (collabReconnectTimer) {
+                clearTimeout(collabReconnectTimer);
+                collabReconnectTimer = null;
+            }
+            if (collabStatusPollTimer) {
+                clearInterval(collabStatusPollTimer);
+                collabStatusPollTimer = null;
+            }
+        }
+
+        function scheduleCollabReconnect(delayMs = 1200) {
+            if (!collabEnabled) return;
+            if (collabReconnectTimer) return;
+            collabReconnectTimer = setTimeout(() => {
+                collabReconnectTimer = null;
+                connectCollab();
+            }, delayMs);
+        }
+
+        function isCollabSocketOpen() {
+            return !!(collabWs && collabWs.readyState === WebSocket.OPEN);
+        }
+
+        async function refreshCollabStatusFromApi() {
+            if (!collabEnabled || !collabProjectId) return;
+            try {
+                const apiBase = (window.Auth && window.Auth.API_BASE) ? window.Auth.API_BASE : 'http://localhost:8000';
+                const resp = await fetch(`${apiBase}/api/collab/status?projectId=${encodeURIComponent(collabProjectId)}`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const remoteCount = Number(data?.onlineCount || 1);
+                collabOnlineCount = Number.isFinite(remoteCount) && remoteCount > 0 ? remoteCount : 1;
+                setCollabStatus(getCollabStatusText(collabOnlineCount), true);
+            } catch (_) {
+                // 静默兜底，不打断编辑
+            }
+        }
+
+        function initCollab() {
+            const session = window.Auth && typeof window.Auth.getSession === 'function' ? window.Auth.getSession() : null;
+            collabSessionId = session?.sessionId || '';
+            collabDisplayName = session?.displayName || session?.username || '';
+            collabProjectId = sessionStorage.getItem(COLLAB_KEYS.projectId) || AppState.project?.id || '';
+            collabEnabled = sessionStorage.getItem(COLLAB_KEYS.enabled) === '1' && !!collabProjectId && !!collabSessionId;
+            const hintCount = Number(sessionStorage.getItem(COLLAB_KEYS.onlineHint) || 1);
+            collabOnlineCount = Number.isFinite(hintCount) && hintCount > 0 ? hintCount : 1;
+
+            if (!collabEnabled) {
+                setCollabStatus('多人编辑未开启', false);
+                return;
+            }
+
+            setCollabStatus(getCollabStatusText(collabOnlineCount), true);
+            connectCollab();
+            clearCollabTimers();
+            collabStatusPollTimer = setInterval(() => {
+                refreshCollabStatusFromApi();
+                if (!isCollabSocketOpen()) {
+                    scheduleCollabReconnect();
+                }
+            }, 2500);
+        }
+
+        function connectCollab() {
+            if (!collabEnabled || !collabSessionId || !collabProjectId) return;
+            if (collabWs && (collabWs.readyState === WebSocket.OPEN || collabWs.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+            const apiBase = (window.Auth && window.Auth.API_BASE) ? window.Auth.API_BASE : 'http://localhost:8000';
+            const wsBase = toWsBaseUrl(apiBase);
+            const wsUrl = `${wsBase}/ws/collab?sessionId=${encodeURIComponent(collabSessionId)}&projectId=${encodeURIComponent(collabProjectId)}`;
+
+            collabWs = new WebSocket(wsUrl);
+            collabWs.onopen = () => {
+                collabWs.send(JSON.stringify({ type: 'join' }));
+                refreshCollabStatusFromApi();
+            };
+            collabWs.onmessage = handleCollabMessage;
+            collabWs.onclose = () => {
+                if (collabEnabled) {
+                    setCollabStatus(getCollabStatusText(collabOnlineCount), true);
+                    scheduleCollabReconnect();
+                }
+            };
+            collabWs.onerror = () => {
+                setCollabStatus('多人编辑连接异常', collabEnabled);
+            };
+        }
+
+        function handleCollabMessage(evt) {
+            let payload;
+            try {
+                payload = JSON.parse(evt.data || '{}');
+            } catch (_) {
+                return;
+            }
+
+            if (payload.type === 'presence') {
+                collabOnlineCount = Number(payload.onlineCount || 1);
+                setCollabStatus(getCollabStatusText(collabOnlineCount), true);
+                return;
+            }
+
+            if (payload.type === 'annotation_add') {
+                if (!payload.annotation) return;
+                applyRemoteAnnotation(payload.annotation);
+                return;
+            }
+
+            if (payload.type === 'page_add') {
+                if (!payload.page) return;
+                applyRemotePageAdd(payload.page);
+                return;
+            }
+
+            if (payload.type === 'page_delete') {
+                if (!payload.pageId) return;
+                applyRemotePageDelete(payload.pageId);
+                return;
+            }
+
+            if (payload.type === 'pages_replace') {
+                applyRemotePagesReplace(payload.pages, payload.version);
+                return;
+            }
+
+            if (payload.type === 'annotations_add_many') {
+                applyRemoteAnnotationsAddMany(payload.annotations);
+                return;
+            }
+
+            if (payload.type === 'annotation_update') {
+                if (!payload.annotation) return;
+                applyRemoteAnnotationUpdate(payload.annotation);
+                return;
+            }
+
+            if (payload.type === 'annotation_delete') {
+                if (!payload.annotationId) return;
+                applyRemoteAnnotationDelete(payload.annotationId);
+                return;
+            }
+
+            if (payload.type === 'annotations_replace') {
+                applyRemoteAnnotationsReplace(payload.annotations, payload.version);
+                return;
+            }
+
+            if (payload.type === 'page_sync_request') {
+                handleRemotePageSyncRequest(payload);
+                return;
+            }
+
+            if (payload.type === 'page_sync_snapshot') {
+                applyRemotePageSyncSnapshot(payload);
+                return;
+            }
+
+            if (payload.type === 'drawing_preview') {
+                const fromSessionId = payload.fromSessionId;
+                if (!fromSessionId || fromSessionId === collabSessionId) return;
+                if (!payload.drawing) {
+                    collabRemoteDrawings.delete(fromSessionId);
+                } else {
+                    collabRemoteDrawings.set(fromSessionId, {
+                        rect: payload.drawing.rect,
+                        displayName: payload.displayName || '协同用户'
+                    });
+                }
+                renderInteractionLayer();
+            }
+        }
+
+        function leaveCollabMode() {
+            if (!collabEnabled) return;
+            if (collabWs && collabWs.readyState === WebSocket.OPEN) {
+                collabWs.send(JSON.stringify({ type: 'leave' }));
+                collabWs.close();
+            }
+            collabWs = null;
+            collabEnabled = false;
+            collabRemoteDrawings.clear();
+            clearCollabTimers();
+            sessionStorage.setItem(COLLAB_KEYS.enabled, '0');
+            sessionStorage.removeItem(COLLAB_KEYS.onlineHint);
+            setCollabStatus('多人编辑未开启', false);
+            renderInteractionLayer();
+        }
+
+        function leaveCollabForContextSwitch() {
+            if (!collabEnabled) return;
+            leaveCollabMode();
+        }
+
+        function leaveCollabOnPageExit() {
+            if (!collabEnabled) return;
+            if (collabWs && collabWs.readyState === WebSocket.OPEN) {
+                try {
+                    collabWs.send(JSON.stringify({ type: 'leave' }));
+                } catch (_) { }
+                try {
+                    collabWs.close(1000, 'page-exit');
+                } catch (_) { }
+            }
+        }
+
+        function collabEmit(event) {
+            if (!collabEnabled || !collabWs || collabWs.readyState !== WebSocket.OPEN) return;
+            collabWs.send(JSON.stringify(event));
+        }
+
+        function collabEmitAnnotationAdd(annotation) {
+            if (!annotation) return;
+            collabEmit({
+                type: 'annotation_add',
+                annotation
+            });
+        }
+
+        function collabEmitPageAdd(page) {
+            if (!page?.id) return;
+            collabEmit({
+                type: 'page_add',
+                page
+            });
+        }
+
+        function collabEmitPageDelete(pageId) {
+            if (!pageId) return;
+            collabEmit({
+                type: 'page_delete',
+                pageId
+            });
+        }
+
+        function collabEmitPagesReplace(pages) {
+            if (!Array.isArray(pages)) return;
+            const version = Date.now();
+            collabEmit({
+                type: 'pages_replace',
+                pages: pages.map(p => JSON.parse(JSON.stringify(p))),
+                version
+            });
+            if (COLLAB_PAGE_SYNC_DEBUG) {
+                console.debug('[collab:pages_replace:emit]', { version, count: pages.length });
+            }
+        }
+
+        function collabEmitAnnotationsAddMany(annotations) {
+            if (!Array.isArray(annotations) || annotations.length === 0) return;
+            collabEmit({
+                type: 'annotations_add_many',
+                annotations
+            });
+        }
+
+        function collabEmitAnnotationUpdate(annotation) {
+            if (!annotation?.id) return;
+            collabEmit({
+                type: 'annotation_update',
+                annotation
+            });
+        }
+
+        function collabEmitAnnotationDelete(annotationId) {
+            if (!annotationId) return;
+            collabEmit({
+                type: 'annotation_delete',
+                annotationId
+            });
+        }
+
+        function collabEmitAnnotationsReplace() {
+            collabEmit({
+                type: 'annotations_replace',
+                annotations: AppState.annotations,
+                version: Date.now()
+            });
+        }
+
+        function collabEmitPageSyncRequest(pageId) {
+            if (!pageId) return;
+            const now = Date.now();
+            if (now - collabLastPageSyncRequestAt < COLLAB_PAGE_SYNC_THROTTLE_MS) return;
+            collabLastPageSyncRequestAt = now;
+            collabEmit({
+                type: 'page_sync_request',
+                pageId,
+                requestAt: now
+            });
+        }
+
+        function collabEmitPageSyncSnapshot(pageId, targetSessionId) {
+            if (!pageId || !targetSessionId) return;
+            const pageAnnotations = AppState.annotations
+                .filter(a => a.pageId === pageId)
+                .map(a => JSON.parse(JSON.stringify(a)));
+            collabEmit({
+                type: 'page_sync_snapshot',
+                pageId,
+                annotations: pageAnnotations,
+                version: Date.now(),
+                targetSessionId
+            });
+        }
+
+        function collabEmitDrawingPreview(drawing) {
+            if (!collabEnabled) return;
+            const now = Date.now();
+            if (drawing && now - collabLastPreviewSentAt < COLLAB_PREVIEW_THROTTLE_MS) {
+                return;
+            }
+            collabLastPreviewSentAt = now;
+            collabEmit({
+                type: 'drawing_preview',
+                drawing
+            });
+        }
+
+        function applyRemoteAnnotation(rawAnnotation) {
+            const annotation = rawAnnotation ? JSON.parse(JSON.stringify(rawAnnotation)) : null;
+            if (!annotation?.id) return;
+            const exists = AppState.annotations.some(a => a.id === annotation.id);
+            if (exists) return;
+            ensureAnnotationRelations(annotation);
+            AppState.annotations.push(annotation);
+            AppState.save();
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+        }
+
+        function applyRemotePageAdd(rawPage) {
+            const page = rawPage ? JSON.parse(JSON.stringify(rawPage)) : null;
+            if (!page?.id || !page?.imageSrc) return;
+            addPage(page, { emitCollab: false, markModified: false, save: true });
+        }
+
+        function applyRemotePageDelete(pageId) {
+            const id = String(pageId || '');
+            if (!id) return;
+            const index = AppState.pages.findIndex(p => p.id === id);
+            if (index === -1) return;
+            deletePage(index, { emitCollab: false, markModified: false, save: true });
+        }
+
+        function applyRemotePagesReplace(rawPages, version) {
+            if (!Array.isArray(rawPages)) return;
+            const v = Number(version || 0);
+            if (v && v < collabLastPagesReplaceVersion) {
+                if (COLLAB_PAGE_SYNC_DEBUG) {
+                    console.debug('[collab:pages_replace:skip-old]', { version: v, lastVersion: collabLastPagesReplaceVersion });
+                }
+                return;
+            }
+            collabLastPagesReplaceVersion = Math.max(collabLastPagesReplaceVersion, v || Date.now());
+
+            const normalizedPages = rawPages
+                .map(p => p ? JSON.parse(JSON.stringify(p)) : null)
+                .filter(p => p?.id && p?.imageSrc)
+                .map((p, i) => ({ ...p, pageNo: i + 1 }));
+
+            const currentIds = AppState.pages.map(p => p.id).join('|');
+            const incomingIds = normalizedPages.map(p => p.id).join('|');
+            if (currentIds === incomingIds && AppState.pages.length === normalizedPages.length) {
+                if (COLLAB_PAGE_SYNC_DEBUG) {
+                    console.debug('[collab:pages_replace:skip-same]', { version: v || collabLastPagesReplaceVersion, count: normalizedPages.length });
+                }
+                return;
+            }
+
+            const pageIdSet = new Set(normalizedPages.map(p => p.id));
+            AppState.pages = normalizedPages;
+            AppState.annotations = AppState.annotations.filter(a => pageIdSet.has(a.pageId));
+
+            if (selectedAnnotation && !pageIdSet.has(selectedAnnotation.pageId)) {
+                selectedAnnotation = null;
+                clearPropertyPanel();
+            }
+
+            if (AppState.pages.length === 0) {
+                AppState.currentPageIndex = 0;
+                AppState.save();
+                showEmptyState();
+                clearCanvases();
+                updateThumbnailList();
+                updatePageNavButtons();
+                updateStatusBar();
+                return;
+            }
+
+            if (AppState.currentPageIndex >= AppState.pages.length) {
+                AppState.currentPageIndex = AppState.pages.length - 1;
+            }
+            if (AppState.currentPageIndex < 0) {
+                AppState.currentPageIndex = 0;
+            }
+
+            AppState.save();
+            loadPage(AppState.currentPageIndex);
+            if (COLLAB_PAGE_SYNC_DEBUG) {
+                console.debug('[collab:pages_replace:applied]', { version: v || collabLastPagesReplaceVersion, count: normalizedPages.length });
+            }
+        }
+
+        function applyRemoteAnnotationsAddMany(annotations) {
+            if (!Array.isArray(annotations) || annotations.length === 0) return;
+            let changed = false;
+            annotations.forEach((raw) => {
+                const annotation = raw ? JSON.parse(JSON.stringify(raw)) : null;
+                if (!annotation?.id) return;
+                const exists = AppState.annotations.some(a => a.id === annotation.id);
+                if (exists) return;
+                ensureAnnotationRelations(annotation);
+                AppState.annotations.push(annotation);
+                changed = true;
+            });
+            if (!changed) return;
+            AppState.save();
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+        }
+
+        function applyRemoteAnnotationUpdate(rawAnnotation) {
+            const incoming = rawAnnotation ? JSON.parse(JSON.stringify(rawAnnotation)) : null;
+            if (!incoming?.id) return;
+            const target = AppState.annotations.find(a => a.id === incoming.id);
+            if (!target) return;
+            Object.assign(target, incoming);
+            ensureAnnotationRelations(target);
+            redrawAnnotations();
+            updateAnnotationList();
+            if (selectedAnnotation?.id === target.id) {
+                selectedAnnotation = target;
+                updatePropertyPanel();
+            }
+            updateStatusBar();
+            AppState.save();
+        }
+
+        function applyRemoteAnnotationDelete(annotationId) {
+            const before = AppState.annotations.length;
+            cleanupRelationsBeforeDelete([annotationId]);
+            AppState.annotations = AppState.annotations.filter(a => a.id !== annotationId);
+            if (AppState.annotations.length === before) return;
+            if (selectedAnnotation?.id === annotationId) {
+                selectedAnnotation = null;
+                clearPropertyPanel();
+            }
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+            AppState.save();
+        }
+
+        function applyRemoteAnnotationsReplace(annotations, version) {
+            const v = Number(version || 0);
+            if (v && v < collabLastReplaceVersion) return;
+            collabLastReplaceVersion = Math.max(collabLastReplaceVersion, v || Date.now());
+            const incoming = Array.isArray(annotations)
+                ? annotations.map(a => ensureAnnotationRelations(a))
+                : [];
+            // 防止远端空数据覆盖本地已有标注（常见于协同会话切换/旧端回流）
+            if (incoming.length === 0 && AppState.annotations.length > 0) {
+                return;
+            }
+            AppState.annotations = incoming;
+            selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            clearPropertyPanel();
+            updateStatusBar();
+            AppState.save();
+        }
+
+        function handleRemotePageSyncRequest(payload) {
+            const requesterSessionId = String(payload?.fromSessionId || '');
+            const pageId = String(payload?.pageId || '');
+            if (!requesterSessionId || requesterSessionId === collabSessionId || !pageId) return;
+            collabEmitPageSyncSnapshot(pageId, requesterSessionId);
+        }
+
+        function applyRemotePageSyncSnapshot(payload) {
+            const targetSessionId = String(payload?.targetSessionId || '');
+            if (!targetSessionId || targetSessionId !== collabSessionId) return;
+
+            const pageId = String(payload?.pageId || '');
+            if (!pageId) return;
+
+            const version = Number(payload?.version || 0);
+            if (version && version < collabLastPageSyncVersion) return;
+            collabLastPageSyncVersion = Math.max(collabLastPageSyncVersion, version || Date.now());
+
+            const incoming = Array.isArray(payload?.annotations)
+                ? payload.annotations.map(a => ensureAnnotationRelations(a))
+                : [];
+            const localPageAnnotations = AppState.annotations.filter(a => a.pageId === pageId);
+            // 防止空快照把本地该页已存在标注清空
+            if (incoming.length === 0 && localPageAnnotations.length > 0) {
+                return;
+            }
+
+            AppState.annotations = AppState.annotations.filter(a => a.pageId !== pageId).concat(incoming);
+            if (selectedAnnotation && selectedAnnotation.pageId === pageId) {
+                selectedAnnotation = null;
+                clearPropertyPanel();
+            }
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+            AppState.save();
+        }
+
+        // ===== 工具选择 =====
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn[id$="Tool"]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tool + 'Tool')?.classList.add('active');
+            interactionCanvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+            syncAttrTypeSelector();
+        }
+
+        function syncAttrTypeSelector() {
+            const attrTypeContainer = document.getElementById('attrTypeContainer');
+            const boxSelector = document.getElementById('boxAttrTypeSelector');
+            const lassoSelector = document.getElementById('lassoAttrTypeSelector');
+            const colorMap = {
+                '字': '#C84A32',
+                '词': '#2B5F8E',
+                '标题': '#D67B3C',
+                '句子': '#5B8C5A',
+                '删除': '#7A7A7A'
+            };
+
+            if (!attrTypeContainer || !boxSelector || !lassoSelector) return;
+
+            if (currentTool === 'box') {
+                attrTypeContainer.style.display = 'block';
+                boxSelector.style.display = 'flex';
+                lassoSelector.style.display = 'none';
+                currentColor = colorMap[defaultNewBoxAttr] || currentColor;
+                boxSelector.querySelectorAll('.attr-type-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.type === defaultNewBoxAttr);
+                });
+                return;
+            }
+
+            if (currentTool === 'lasso') {
+                attrTypeContainer.style.display = 'block';
+                boxSelector.style.display = 'none';
+                lassoSelector.style.display = 'flex';
+                currentColor = colorMap[defaultLassoAction] || currentColor;
+                lassoSelector.querySelectorAll('.attr-type-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.type === defaultLassoAction);
+                });
+                return;
+            }
+
+            if (selectedAnnotation && selectedAnnotation.type === 'box') {
+                attrTypeContainer.style.display = 'block';
+                boxSelector.style.display = 'flex';
+                lassoSelector.style.display = 'none';
+                boxSelector.querySelectorAll('.attr-type-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.type === selectedAnnotation.attrType);
+                });
+                return;
+            }
+
+            attrTypeContainer.style.display = 'none';
+        }
+
+        // ===== 属性类型选择 =====
+        function selectAttrType(btn) {
+            document.querySelectorAll('.attr-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const selectedType = btn.dataset.type;
+
+            // 根据属性类型自动设置颜色
+            const colorMap = {
+                '字': '#C84A32',    // --mark-red
+                '词': '#2B5F8E',    // --mark-blue
+                '标题': '#D67B3C', // --mark-orange
+                '句子': '#5B8C5A',  // --mark-green
+                '删除': '#7A7A7A'
+            };
+            const newColor = colorMap[selectedType];
+
+            if (currentTool === 'box') {
+                defaultNewBoxAttr = selectedType;
+                currentColor = newColor;
+            } else if (currentTool === 'lasso') {
+                defaultLassoAction = selectedType;
+                currentColor = newColor;
+            } else {
+                currentAttrType = selectedType;
+                currentColor = newColor;
+                if (selectedAnnotation && selectedAnnotation.type === 'box') {
+                    selectedAnnotation.color = currentColor;
+                    selectedAnnotation.attrType = currentAttrType;
+                    redrawAnnotations();
+                    updateAnnotationList();
+                    collabEmitAnnotationUpdate(selectedAnnotation);
+                    markAsModified();
+                }
+            }
+        }
+        // ===== 颜色选择 =====
+        function selectColor(el) {
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            el.classList.add('selected');
+            currentColor = el.dataset.color;
+
+            // 取消属性类型按钮的激活状态（因为用户手动选择了颜色）
+            if (currentMarkType === 'box') {
+                document.querySelectorAll('.attr-type-btn').forEach(b => b.classList.remove('active'));
+            }
+
+            if (selectedAnnotation) {
+                selectedAnnotation.color = currentColor;
+                redrawAnnotations();
+                updateAnnotationList();
+                collabEmitAnnotationUpdate(selectedAnnotation);
+                markAsModified();
+            }
+        }
+
+        // ===== 标注类型选择 =====
+        function selectMarkType(btn) {
+            document.querySelectorAll('.mark-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMarkType = btn.dataset.type;
+
+            // 显示/隐藏属性类型选择器
+            const attrTypeContainer = document.getElementById('attrTypeContainer');
+            if (currentMarkType === 'box') {
+                attrTypeContainer.style.display = 'block';
+            } else {
+                attrTypeContainer.style.display = 'none';
+            }
+
+            if (selectedAnnotation) {
+                selectedAnnotation.type = currentMarkType;
+                redrawAnnotations();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        // ===== 画布操作 =====
+        function handleCanvasMouseDown(e) {
+            if (!AppState.pages.length) return;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
+
+            if (currentTool === 'select') {
+                const clicked = findAnnotationAt(x, y);
+                if (clicked) {
+                    selectAnnotation(clicked);
+                } else {
+                    deselectAnnotation();
+                }
+            } else if (currentTool === 'slash') {
+                // 斜线绘制
+                isDrawing = true;
+                slashStartX = x;
+                slashStartY = y;
+                currentSlashPreview = null;
+            } else {
+                isDrawing = true;
+                startX = x;
+                startY = y;
+                currentRect = { x, y, width: 0, height: 0 };
+            }
+        }
+
+        function handleCanvasMouseMove(e) {
+            if (!isDrawing) return;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
+
+            if (currentTool === 'slash') {
+                currentSlashPreview = { x1: slashStartX, y1: slashStartY, x2: x, y2: y };
+                renderInteractionLayer();
+                collabEmitDrawingPreview({
+                    rect: {
+                        x: Math.min(slashStartX, x),
+                        y: Math.min(slashStartY, y),
+                        width: Math.abs(x - slashStartX),
+                        height: Math.abs(y - slashStartY)
+                    }
+                });
+            } else {
+                currentRect.width = x - startX;
+                currentRect.height = y - startY;
+                drawCurrentRect();
+                collabEmitDrawingPreview({
+                    rect: {
+                        x: currentRect.width > 0 ? currentRect.x : currentRect.x + currentRect.width,
+                        y: currentRect.height > 0 ? currentRect.y : currentRect.y + currentRect.height,
+                        width: Math.abs(currentRect.width),
+                        height: Math.abs(currentRect.height)
+                    }
+                });
+            }
+        }
+
+        function handleCanvasMouseUp(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
+
+            if (currentTool === 'slash') {
+                // 创建斜线标注
+                const distance = Math.sqrt(Math.pow(x - slashStartX, 2) + Math.pow(y - slashStartY, 2));
+                if (distance > 10) {
+                    createSlashAnnotation(slashStartX, slashStartY, x, y);
+                }
+            } else if (currentRect && Math.abs(currentRect.width) > 5 && Math.abs(currentRect.height) > 5) {
+                const normalizedRect = {
+                    x: currentRect.width > 0 ? currentRect.x : currentRect.x + currentRect.width,
+                    y: currentRect.height > 0 ? currentRect.y : currentRect.y + currentRect.height,
+                    width: Math.abs(currentRect.width),
+                    height: Math.abs(currentRect.height)
+                };
+
+                if (currentTool === 'lasso') {
+                    applyLassoAction(normalizedRect);
+                } else {
+                    createAnnotation(normalizedRect);
+                }
+            }
+
+            currentRect = null;
+            currentSlashPreview = null;
+            collabEmitDrawingPreview(null);
+            renderInteractionLayer();
+        }
+
+        function drawCurrentRect() {
+            renderInteractionLayer();
+        }
+
+        function clearInteractionCanvas() {
+            currentRect = null;
+            currentSlashPreview = null;
+            renderInteractionLayer();
+        }
+
+        function renderInteractionLayer() {
+            interactionCtx.clearRect(0, 0, interactionCanvas.width, interactionCanvas.height);
+
+            if (currentTool === 'slash' && currentSlashPreview) {
+                interactionCtx.strokeStyle = '#E0E0E0';
+                interactionCtx.lineWidth = 1;
+                interactionCtx.setLineDash([5, 5]);
+                interactionCtx.beginPath();
+                interactionCtx.moveTo(currentSlashPreview.x1, currentSlashPreview.y1);
+                interactionCtx.lineTo(currentSlashPreview.x2, currentSlashPreview.y2);
+                interactionCtx.stroke();
+                interactionCtx.setLineDash([]);
+            } else if (currentRect) {
+                interactionCtx.strokeStyle = currentColor;
+                interactionCtx.lineWidth = 2;
+                interactionCtx.setLineDash([5, 5]);
+                interactionCtx.strokeRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
+                interactionCtx.setLineDash([]);
+            }
+
+            collabRemoteDrawings.forEach((entry) => {
+                const rect = entry?.rect;
+                if (!rect) return;
+                const displayName = String(entry.displayName || '协同用户');
+                interactionCtx.strokeStyle = '#2B5F8E';
+                interactionCtx.lineWidth = 2;
+                interactionCtx.setLineDash([6, 4]);
+                interactionCtx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+                interactionCtx.setLineDash([]);
+
+                const labelPaddingX = 8;
+                const labelHeight = 20;
+                interactionCtx.font = '12px Noto Sans SC';
+                const textWidth = interactionCtx.measureText(displayName).width;
+                const labelWidth = textWidth + labelPaddingX * 2;
+                const labelX = rect.x;
+                const labelY = rect.y + rect.height + 6;
+
+                interactionCtx.fillStyle = 'rgba(43,95,142,0.92)';
+                interactionCtx.fillRect(labelX, labelY, labelWidth, labelHeight);
+                interactionCtx.fillStyle = '#fff';
+                interactionCtx.textBaseline = 'middle';
+                interactionCtx.fillText(displayName, labelX + labelPaddingX, labelY + labelHeight / 2);
+            });
+        }
+
+        // ===== 标注操作 =====
+        function ensureAnnotationRelations(ann) {
+            if (ann.parentId === undefined) ann.parentId = null;
+            if (!Array.isArray(ann.childIds)) ann.childIds = [];
+            return ann;
+        }
+
+        function isAnnotationHiddenByMerge(ann) {
+            if (!ann || !ann.parentId) return false;
+            return selectedAnnotation?.id !== ann.id;
+        }
+
+        function cleanupRelationsBeforeDelete(idsToDelete) {
+            const idSet = new Set(idsToDelete);
+            const idMap = new Map(AppState.annotations.map(a => [a.id, ensureAnnotationRelations(a)]));
+
+            idsToDelete.forEach(id => {
+                const ann = idMap.get(id);
+                if (!ann) return;
+
+                if (ann.parentId && !idSet.has(ann.parentId)) {
+                    const parent = idMap.get(ann.parentId);
+                    if (parent) {
+                        parent.childIds = parent.childIds.filter(childId => childId !== ann.id);
+                    }
+                }
+
+                ann.childIds.forEach(childId => {
+                    if (idSet.has(childId)) return;
+                    const child = idMap.get(childId);
+                    if (child && child.parentId === ann.id) {
+                        child.parentId = null;
+                    }
+                });
+            });
+        }
+
+        function isRectFullyInside(inner, outer) {
+            return inner.x >= outer.x &&
+                inner.y >= outer.y &&
+                inner.x + inner.width <= outer.x + outer.width &&
+                inner.y + inner.height <= outer.y + outer.height;
+        }
+
+        function getContainedAnnotationsByMode(rect, mode) {
+            const pageId = AppState.pages[AppState.currentPageIndex]?.id;
+            return AppState.annotations.filter(ann => {
+                ensureAnnotationRelations(ann);
+                if (ann.pageId !== pageId || ann.type !== 'box' || !ann.rect) return false;
+                if (ann.parentId) return false;
+                if (!isRectFullyInside(ann.rect, rect)) return false;
+
+                if (mode === '词') return ann.attrType === '字';
+                if (mode === '句子') return ann.attrType === '字' || ann.attrType === '词';
+                if (mode === '标题') return ann.attrType === '字' || ann.attrType === '词' || ann.attrType === '句子';
+                if (mode === '删除') return ann.attrType === '字' || ann.attrType === '词' || ann.attrType === '句子' || ann.attrType === '标题';
+                return false;
+            });
+        }
+
+        function sortByVerticalReadingOrder(list) {
+            const columnTolerance = 20;
+            return [...list].sort((a, b) => {
+                const centerAX = a.rect.x + a.rect.width / 2;
+                const centerBX = b.rect.x + b.rect.width / 2;
+                const dx = centerBX - centerAX;
+                if (Math.abs(dx) <= columnTolerance) {
+                    const centerAY = a.rect.y + a.rect.height / 2;
+                    const centerBY = b.rect.y + b.rect.height / 2;
+                    return centerAY - centerBY;
+                }
+                return dx;
+            });
+        }
+
+        function buildMergedText(list) {
+            return list
+                .map(ann => (ann.simplifiedChar || '').trim())
+                .filter(Boolean)
+                .join('');
+        }
+
+        function getBoundingRect(list) {
+            const xs = list.map(ann => ann.rect.x);
+            const ys = list.map(ann => ann.rect.y);
+            const x2s = list.map(ann => ann.rect.x + ann.rect.width);
+            const y2s = list.map(ann => ann.rect.y + ann.rect.height);
+
+            const minX = Math.min(...xs);
+            const minY = Math.min(...ys);
+            const maxX = Math.max(...x2s);
+            const maxY = Math.max(...y2s);
+
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX,
+                height: maxY - minY
+            };
+        }
+
+        function applyLassoAction(rect) {
+            const mode = defaultLassoAction;
+            const targets = getContainedAnnotationsByMode(rect, mode);
+            if (!targets.length) return;
+            if (mode !== '删除' && mode !== '标题' && targets.length < 2) return;
+
+            if (mode === '删除') {
+                saveUndoState();
+                const targetIds = targets.map(item => item.id);
+                cleanupRelationsBeforeDelete(targetIds);
+                const targetSet = new Set(targetIds);
+                AppState.annotations = AppState.annotations.filter(ann => !targetSet.has(ann.id));
+                if (selectedAnnotation && targetSet.has(selectedAnnotation.id)) {
+                    selectedAnnotation = null;
+                }
+                collabEmitAnnotationsReplace();
+            } else {
+                const ordered = sortByVerticalReadingOrder(targets);
+                const mergedText = buildMergedText(ordered);
+                if (!mergedText) {
+                    setStatus('所选标注未填写简体字，无法拼接');
+                    return;
+                }
+                saveUndoState();
+                const mergedRect = getBoundingRect(ordered);
+                const colorMap = { '词': '#2B5F8E', '句子': '#5B8C5A', '标题': '#D67B3C' };
+
+                const annotation = {
+                    id: 'ann_' + Date.now(),
+                    pageId: AppState.pages[AppState.currentPageIndex]?.id,
+                    type: 'box',
+                    rect: mergedRect,
+                    color: colorMap[mode],
+                    simplifiedChar: mergedText,
+                    note: '',
+                    attrType: mode,
+                    parentId: null,
+                    childIds: ordered.map(item => item.id)
+                };
+                AppState.annotations.push(annotation);
+                collabEmitAnnotationAdd(annotation);
+                // 词/句子/标题模式：让被合并的字/词/句子进入父子关系，画布按 isAnnotationHiddenByMerge 隐藏它们
+                ordered.forEach(item => {
+                    ensureAnnotationRelations(item);
+                    item.parentId = annotation.id;
+                });
+                selectedAnnotation = annotation;
+                collabEmitAnnotationsReplace();
+            }
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function createAnnotation(rect) {
+            saveUndoState();
+
+            const annotation = {
+                id: 'ann_' + Date.now(),
+                pageId: AppState.pages[AppState.currentPageIndex]?.id,
+                type: currentMarkType,
+                rect: rect,
+                color: currentColor,
+                simplifiedChar: '',
+                note: '',
+                attrType: currentMarkType === 'box' ? defaultNewBoxAttr : null,
+                parentId: null,
+                childIds: []
+            };
+
+            AppState.annotations.push(annotation);
+            collabEmitAnnotationAdd(annotation);
+            selectedAnnotation = annotation;
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function createSlashAnnotation(x1, y1, x2, y2) {
+            saveUndoState();
+
+            const annotation = {
+                id: 'ann_' + Date.now(),
+                pageId: AppState.pages[AppState.currentPageIndex]?.id,
+                type: 'slash',
+                x1: x1,
+                y1: y1,
+                x2: x2,
+                y2: y2,
+                color: '#E0E0E0',
+                simplifiedChar: '',
+                note: '',
+                parentId: null,
+                childIds: []
+            };
+
+            AppState.annotations.push(annotation);
+            collabEmitAnnotationAdd(annotation);
+            selectedAnnotation = annotation;
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function selectAnnotation(annotation) {
+            selectedAnnotation = annotation;
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+        }
+
+        function deselectAnnotation() {
+            selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            clearPropertyPanel();
+        }
+
+        function deleteAnnotation(id) {
+            saveUndoState();
+            cleanupRelationsBeforeDelete([id]);
+            AppState.annotations = AppState.annotations.filter(a => a.id !== id);
+            if (selectedAnnotation?.id === id) {
+                selectedAnnotation = null;
+            }
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+            collabEmitAnnotationDelete(id);
+            markAsModified();
+        }
+
+        function findAnnotationAt(x, y) {
+            for (let i = AppState.annotations.length - 1; i >= 0; i--) {
+                const ann = AppState.annotations[i];
+                ensureAnnotationRelations(ann);
+                if (ann.pageId !== AppState.pages[AppState.currentPageIndex]?.id) continue;
+                if (isAnnotationHiddenByMerge(ann)) continue;
+
+                if (ann.type === 'slash') {
+                    // 斜线检测（简化为矩形检测）
+                    const minX = Math.min(ann.x1, ann.x2);
+                    const maxX = Math.max(ann.x1, ann.x2);
+                    const minY = Math.min(ann.y1, ann.y2);
+                    const maxY = Math.max(ann.y1, ann.y2);
+                    const padding = 5;
+                    if (x >= minX - padding && x <= maxX + padding && y >= minY - padding && y <= maxY + padding) {
+                        return ann;
+                    }
+                } else if (ann.rect) {
+                    if (x >= ann.rect.x && x <= ann.rect.x + ann.rect.width &&
+                        y >= ann.rect.y && y <= ann.rect.y + ann.rect.height) {
+                        return ann;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function redrawAnnotations() {
+            annotationCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+
+            AppState.annotations.forEach(ann => {
+                ensureAnnotationRelations(ann);
+                if (ann.pageId !== AppState.pages[AppState.currentPageIndex]?.id) return;
+                if (isAnnotationHiddenByMerge(ann)) return;
+
+                const isSelected = selectedAnnotation?.id === ann.id;
+                annotationCtx.strokeStyle = ann.color;
+                annotationCtx.fillStyle = ann.color;
+
+                switch (ann.type) {
+                    case 'box':
+                        annotationCtx.lineWidth = isSelected ? 3 : 2;
+                        annotationCtx.strokeRect(ann.rect.x, ann.rect.y, ann.rect.width, ann.rect.height);
+                        break;
+                    case 'underline':
+                        annotationCtx.lineWidth = isSelected ? 4 : 3;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.rect.x, ann.rect.y + ann.rect.height);
+                        annotationCtx.lineTo(ann.rect.x + ann.rect.width, ann.rect.y + ann.rect.height);
+                        annotationCtx.stroke();
+                        break;
+                    case 'highlight':
+                        annotationCtx.globalAlpha = 0.3;
+                        annotationCtx.fillRect(ann.rect.x, ann.rect.y, ann.rect.width, ann.rect.height);
+                        annotationCtx.globalAlpha = 1;
+                        break;
+                    case 'strikethrough':
+                        annotationCtx.lineWidth = isSelected ? 4 : 3;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.rect.x, ann.rect.y + ann.rect.height / 2);
+                        annotationCtx.lineTo(ann.rect.x + ann.rect.width, ann.rect.y + ann.rect.height / 2);
+                        annotationCtx.stroke();
+                        break;
+                    case 'slash':
+                        annotationCtx.lineWidth = isSelected ? 2 : 1;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.x1, ann.y1);
+                        annotationCtx.lineTo(ann.x2, ann.y2);
+                        annotationCtx.stroke();
+                        break;
+                }
+            });
+        }
+
+        // ===== 属性面板 =====
+        function updatePropertyPanel() {
+            if (!selectedAnnotation) {
+                clearPropertyPanel();
+                return;
+            }
+
+            document.getElementById('simplifiedCharInput').value = selectedAnnotation.simplifiedChar || '';
+            document.getElementById('annotationNoteInput').value = selectedAnnotation.note || '';
+
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.remove('selected');
+                if (s.dataset.color === selectedAnnotation.color) {
+                    s.classList.add('selected');
+                }
+            });
+
+            document.querySelectorAll('.mark-type-btn').forEach(b => {
+                b.classList.remove('active');
+                if (b.dataset.type === selectedAnnotation.type) {
+                    b.classList.add('active');
+                }
+            });
+
+            // 更新属性类型选择器
+            syncAttrTypeSelector();
+        }
+
+        function clearPropertyPanel() {
+            document.getElementById('simplifiedCharInput').value = '';
+            document.getElementById('annotationNoteInput').value = '';
+            syncAttrTypeSelector();
+        }
+
+        function updateAnnotationSimplified(value) {
+            if (selectedAnnotation) {
+                selectedAnnotation.simplifiedChar = value;
+                updateAnnotationList();
+                collabEmitAnnotationUpdate(selectedAnnotation);
+                markAsModified();
+            }
+        }
+
+        function updateAnnotationNote(value) {
+            if (selectedAnnotation) {
+                selectedAnnotation.note = value;
+                collabEmitAnnotationUpdate(selectedAnnotation);
+                markAsModified();
+            }
+        }
+
+        // ===== 标注列表 =====
+        function updateAnnotationList() {
+            const container = document.getElementById('annotationList');
+            const pageAnnotations = AppState.annotations.filter(a =>
+                a.pageId === AppState.pages[AppState.currentPageIndex]?.id
+            );
+
+            document.getElementById('annotationCount').textContent = pageAnnotations.length + '条';
+
+            if (pageAnnotations.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--color-text-light); font-size: 12px;">暂无标注</div>';
+                return;
+            }
+
+            container.innerHTML = pageAnnotations.map(ann => {
+                const typeName = ann.type === 'slash' ? '斜线' : getMarkTypeName(ann.type);
+                const attrInfo = ann.attrType ? ` <span style="color:${ann.color};">(${ann.attrType})</span>` : '';
+                let displayChar;
+                if (ann.attrType === '句子') {
+                    displayChar = '句';
+                }
+                else if (ann.attrType === '词') {
+                    displayChar = '词';
+                }
+                else if (ann.attrType === '标题') {
+                    displayChar = '题';
+                }
+                else {
+                    displayChar = ann.simplifiedChar || (ann.type === 'slash' ? '/' : '?');
+                }
+                return `
+                    <div class="annotation-card ${selectedAnnotation?.id === ann.id ? 'selected' : ''}" onclick="selectAnnotationById('${ann.id}')">
+                        <div class="annotation-preview">
+                            <div class="annotation-char" style="border-left: 3px solid ${ann.color};">${displayChar}</div>
+                            <div class="annotation-info">
+                                <div class="annotation-simplified">${ann.simplifiedChar || '（未填）'}${attrInfo}</div>
+                                <div class="annotation-type">${typeName}</div>
+                            </div>
+                        </div>
+                        <div class="annotation-actions">
+                            <button class="annotation-action-btn" onclick="event.stopPropagation(); selectAnnotationById('${ann.id}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                            <button class="annotation-action-btn delete" onclick="event.stopPropagation(); deleteAnnotation('${ann.id}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectAnnotationById(id) {
+            const ann = AppState.annotations.find(a => a.id === id);
+            if (ann) selectAnnotation(ann);
+        }
+
+        // ===== 页面管理 =====
+        async function handleImageImport(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+
+            if (!AppState.project) {
+                openModal('projectModal');
+            }
+
+            const imageFiles = [];
+            const pdfFiles = [];
+            const unsupportedFiles = [];
+
+            files.forEach(file => {
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    pdfFiles.push(file);
+                } else if (file.type.startsWith('image/')) {
+                    imageFiles.push(file);
+                } else {
+                    unsupportedFiles.push(file.name);
+                }
+            });
+
+            if (unsupportedFiles.length > 0) {
+                alert('以下文件格式暂不支持：\n' + unsupportedFiles.join('\n'));
+            }
+
+            try {
+                for (let i = 0; i < imageFiles.length; i++) {
+                    await importImageFile(imageFiles[i], i);
+                }
+
+                for (const pdfFile of pdfFiles) {
+                    await importPdfFile(pdfFile);
+                }
+            } catch (err) {
+                alert(err.message || '导入失败，请重试');
+            }
+
+            event.target.value = '';
+        }
+
+        function importImageFile(file, index) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        addPage({
+                            id: 'page_' + Date.now() + '_' + index,
+                            pageNo: AppState.pages.length + 1,
+                            imageSrc: e.target.result,
+                            width: img.width,
+                            height: img.height
+                        });
+                        resolve();
+                    };
+                    img.onerror = () => reject(new Error('图片读取失败：' + file.name));
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => reject(new Error('文件读取失败：' + file.name));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function parsePageRange(input, totalPages) {
+            const text = (input || '').trim();
+            if (!text) {
+                return Array.from({ length: totalPages }, (_, i) => i + 1);
+            }
+
+            const pages = new Set();
+            const parts = text.split(',').map(s => s.trim()).filter(Boolean);
+            if (parts.length === 0) {
+                throw new Error('页码范围不能为空');
+            }
+
+            parts.forEach(part => {
+                if (/^\d+$/.test(part)) {
+                    const page = Number(part);
+                    if (page < 1 || page > totalPages) {
+                        throw new Error(`页码 ${page} 超出范围（1-${totalPages}）`);
+                    }
+                    pages.add(page);
+                    return;
+                }
+
+                const match = part.match(/^(\d+)\s*-\s*(\d+)$/);
+                if (!match) {
+                    throw new Error(`无效范围格式：${part}`);
+                }
+
+                const start = Number(match[1]);
+                const end = Number(match[2]);
+                if (start > end) {
+                    throw new Error(`范围起始页不能大于结束页：${part}`);
+                }
+                if (start < 1 || end > totalPages) {
+                    throw new Error(`范围 ${part} 超出总页数（1-${totalPages}）`);
+                }
+                for (let p = start; p <= end; p++) {
+                    pages.add(p);
+                }
+            });
+
+            return Array.from(pages).sort((a, b) => a - b);
+        }
+
+        function requestPdfPageRange(totalPages, fileName) {
+            pdfRangeTotalPages = totalPages;
+            return new Promise((resolve) => {
+                pdfRangeResolver = resolve;
+                document.getElementById('pdfRangeModalTitle').textContent = `导入 PDF 页码范围 - ${fileName}`;
+                document.getElementById('pdfTotalPagesHint').textContent = `总页数：${totalPages}`;
+                const input = document.getElementById('pdfPageRangeInput');
+                input.value = '';
+                openModal('pdfRangeModal');
+                setTimeout(() => input.focus(), 0);
+            });
+        }
+
+        function confirmPdfRangeSelection() {
+            if (!pdfRangeResolver) return;
+            const inputValue = document.getElementById('pdfPageRangeInput').value;
+            try {
+                const pages = parsePageRange(inputValue, pdfRangeTotalPages);
+                const resolver = pdfRangeResolver;
+                pdfRangeResolver = null;
+                closeModal('pdfRangeModal');
+                resolver(pages);
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function cancelPdfRangeSelection() {
+            if (!pdfRangeResolver) return;
+            const resolver = pdfRangeResolver;
+            pdfRangeResolver = null;
+            closeModal('pdfRangeModal');
+            resolver(null);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && pdfRangeResolver) {
+                cancelPdfRangeSelection();
+            }
+        });
+
+        async function importPdfFile(file) {
+            if (!window.pdfjsLib) {
+                throw new Error('PDF 解析库加载失败，请检查网络后重试');
+            }
+            if (window.pdfjsLib.GlobalWorkerOptions) {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
+            }
+
+            setStatus('正在读取 PDF：' + file.name);
+            const buffer = await file.arrayBuffer();
+            const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+            const selectedPages = await requestPdfPageRange(pdf.numPages, file.name);
+            if (!selectedPages || selectedPages.length === 0) {
+                setStatus('已取消 PDF 导入');
+                return;
+            }
+
+            const failedPages = [];
+            for (let i = 0; i < selectedPages.length; i++) {
+                const pageNo = selectedPages[i];
+                try {
+                    setStatus(`正在导入 ${file.name}：第 ${pageNo} 页（${i + 1}/${selectedPages.length}）`);
+                    const page = await pdf.getPage(pageNo);
+                    const viewport = page.getViewport({ scale: 2 });
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = Math.round(viewport.width);
+                    canvas.height = Math.round(viewport.height);
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    addPage({
+                        id: `page_${Date.now()}_${pageNo}_${Math.random().toString(36).slice(2, 8)}`,
+                        pageNo: AppState.pages.length + 1,
+                        imageSrc: canvas.toDataURL('image/png'),
+                        width: canvas.width,
+                        height: canvas.height
+                    });
+                } catch (err) {
+                    failedPages.push(pageNo);
+                }
+            }
+
+            if (failedPages.length > 0) {
+                alert(`PDF 已部分导入，失败页码：${failedPages.join(', ')}`);
+            }
+            setStatus(`PDF 导入完成：${selectedPages.length - failedPages.length}/${selectedPages.length} 页`);
+        }
+
+        function addPage(page, options = {}) {
+            if (!page?.id || !page?.imageSrc) return false;
+            const exists = AppState.pages.some(p => p.id === page.id);
+            if (exists) return false;
+
+            const emitCollab = options.emitCollab !== false;
+            const markModifiedFlag = options.markModified !== false;
+            const saveFlag = options.save !== false;
+
+            const normalized = JSON.parse(JSON.stringify(page));
+            normalized.pageNo = AppState.pages.length + 1;
+            AppState.pages.push(normalized);
+
+            if (saveFlag) {
+                AppState.save();
+            }
+            updateThumbnailList();
+
+            if (AppState.pages.length === 1) {
+                loadPage(0);
+            }
+
+            updatePageNavButtons();
+            updateStatusBar();
+            if (markModifiedFlag) {
+                markAsModified();
+            }
+            if (emitCollab) {
+                collabEmitPageAdd(normalized);
+                collabEmitPagesReplace(AppState.pages);
+            }
+            return true;
+        }
+
+        function loadPage(index) {
+            if (index < 0 || index >= AppState.pages.length) return;
+
+            AppState.currentPageIndex = index;
+            const page = AppState.pages[index];
+
+            mainCanvas.width = page.width;
+            mainCanvas.height = page.height;
+            annotationCanvas.width = page.width;
+            annotationCanvas.height = page.height;
+            interactionCanvas.width = page.width;
+            interactionCanvas.height = page.height;
+
+            const img = new Image();
+            img.onload = () => {
+                mainCtx.drawImage(img, 0, 0);
+                hideEmptyState();
+                redrawAnnotations();
+                updateAnnotationList();
+            };
+            img.src = page.imageSrc;
+
+            updatePageIndicator();
+            updateThumbnailList();
+            updatePageNavButtons();
+            updateStatusBar();
+            if (collabEnabled && isCollabSocketOpen()) {
+                const localPageAnnotations = AppState.annotations.filter(a => a.pageId === page.id);
+                // 本地已有标注时不主动拉取远端快照，避免被旧快照覆盖
+                if (localPageAnnotations.length === 0) {
+                    collabEmitPageSyncRequest(page.id);
+                }
+            }
+        }
+
+        function updateThumbnailList() {
+            const container = document.getElementById('thumbnailList');
+
+            if (AppState.pages.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--color-text-light); font-size: 11px;">暂无页面</div>';
+                return;
+            }
+
+            container.innerHTML = AppState.pages.map((page, index) => `
+                <div class="thumbnail-item ${index === AppState.currentPageIndex ? 'active' : ''}" onclick="loadPage(${index})">
+                    <img src="${page.imageSrc}" alt="Page ${index + 1}">
+                    <span class="thumbnail-page">${index + 1}</span>
+                    <button class="thumbnail-delete" onclick="event.stopPropagation(); deletePage(${index})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function deletePage(index, options = {}) {
+            if (!Number.isInteger(index) || index < 0 || index >= AppState.pages.length) return;
+            const emitCollab = options.emitCollab !== false;
+            const markModifiedFlag = options.markModified !== false;
+            const saveFlag = options.save !== false;
+            const targetPage = AppState.pages[index];
+            const targetPageId = targetPage?.id || null;
+
+            if (AppState.pages.length <= 1) {
+                AppState.pages = [];
+                AppState.annotations = [];
+                AppState.currentPageIndex = 0;
+                if (saveFlag) {
+                    AppState.save();
+                }
+                showEmptyState();
+                clearCanvases();
+                selectedAnnotation = null;
+                clearPropertyPanel();
+                updateAnnotationList();
+            } else {
+                const pageId = AppState.pages[index].id;
+                AppState.annotations = AppState.annotations.filter(a => a.pageId !== pageId);
+                AppState.pages.splice(index, 1);
+                AppState.pages.forEach((p, i) => p.pageNo = i + 1);
+
+                if (AppState.currentPageIndex >= AppState.pages.length) {
+                    AppState.currentPageIndex = AppState.pages.length - 1;
+                }
+                if (saveFlag) {
+                    AppState.save();
+                }
+                loadPage(AppState.currentPageIndex);
+            }
+
+            updateThumbnailList();
+            updatePageNavButtons();
+            updateStatusBar();
+            if (markModifiedFlag) {
+                markAsModified();
+            }
+            if (emitCollab) {
+                if (targetPageId) {
+                    collabEmitPageDelete(targetPageId);
+                }
+                collabEmitPagesReplace(AppState.pages);
+            }
+        }
+
+        function goToFirstPage() { loadPage(0); }
+        function goToPrevPage() { loadPage(AppState.currentPageIndex - 1); }
+        function goToNextPage() { loadPage(AppState.currentPageIndex + 1); }
+        function goToLastPage() { loadPage(AppState.pages.length - 1); }
+
+        function updatePageNavButtons() {
+            const btns = document.querySelectorAll('.page-nav-btn');
+            if (btns.length >= 4) {
+                btns[0].disabled = AppState.currentPageIndex <= 0;
+                btns[1].disabled = AppState.currentPageIndex <= 0;
+                btns[2].disabled = AppState.currentPageIndex >= AppState.pages.length - 1;
+                btns[3].disabled = AppState.currentPageIndex >= AppState.pages.length - 1;
+            }
+        }
+
+        function updatePageIndicator() {
+            document.getElementById('pageIndicator').textContent =
+                `${AppState.currentPageIndex + 1} / ${Math.max(1, AppState.pages.length)}`;
+        }
+
+        // ===== 缩放 =====
+        function zoomIn() {
+            zoom = Math.min(4, zoom + 0.25);
+            applyZoom();
+        }
+
+        function zoomOut() {
+            zoom = Math.max(0.25, zoom - 0.25);
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const wrapper = document.getElementById('canvasWrapper');
+            wrapper.style.transform = `scale(${zoom})`;
+            document.getElementById('zoomValue').textContent = Math.round(zoom * 100) + '%';
+            document.getElementById('statusZoom').textContent = Math.round(zoom * 100) + '%';
+        }
+
+        function handleWheelZoom(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                if (e.deltaY < 0) zoomIn();
+                else zoomOut();
+            }
+        }
+
+        // ===== 项目管理 =====
+
+        function fillProjectForm(project = {}) {
+            document.getElementById('projectTitle').value = project.title || '';
+            document.getElementById('projectAuthor').value = project.author || '';
+            document.getElementById('projectDynasty').value = project.dynasty || '';
+            document.getElementById('projectBook').value = project.book || '';
+            document.getElementById('projectVolume').value = project.volume || '';
+        }
+
+        function createNewProject() {
+            fillProjectForm(AppState.project || {});
+            openModal('projectModal');
+        }
+
+        function isProjectInfoComplete() {
+            return AppState.project &&
+                AppState.project.title &&
+                AppState.project.author &&
+                AppState.project.dynasty &&
+                AppState.project.book &&
+                AppState.project.volume;
+        }
+
+        function confirmNewProject() {
+            leaveCollabForContextSwitch();
+            const title = document.getElementById('projectTitle').value.trim();
+            if (!title) {
+                alert('请输入古籍标题');
+                return;
+            }
+
+            const existingProject = AppState.project || {};
+            AppState.project = {
+                id: existingProject.id || ('proj_' + Date.now()),
+                title: title,
+                author: document.getElementById('projectAuthor').value.trim(),
+                dynasty: document.getElementById('projectDynasty').value.trim(),
+                book: document.getElementById('projectBook').value.trim(),
+                volume: document.getElementById('projectVolume').value.trim()
+            };
+
+            AppState.save();
+            closeModal('projectModal');
+            setStatus(existingProject.id ? '项目已更新' : '项目已创建');
+        }
+
+        function handleProjectOpen(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            leaveCollabForContextSwitch();
+
+            ProjectManager.import(file).then(() => {
+                updateUI();
+                if (AppState.pages.length > 0) {
+                    loadPage(0);
+                }
+            }).catch(err => {
+                alert(err.message);
+            });
+
+            event.target.value = '';
+        }
+
+        async function saveProject() {
+            // 1. 检查 AppState 数据是否完整
+            if (!isProjectInfoComplete()) {
+                alert('请先完善并确认项目基本信息（标题、作者、朝代等）');
+                createNewProject(); // 自动打开弹窗
+                return; // 中止程序，不执行后面的 AppState.save()
+            }
+
+            // 2. 若信息完整，执行原有程序
+            AppState.save();
+
+            // 3. 同步到数据库（保存“项目快照”）
+            try {
+                const snapshotPayload = {
+                    project: AppState.project,
+                    pages: AppState.pages,
+                    annotations: AppState.annotations,
+                    customChars: AppState.customChars,
+                    exportedAt: new Date().toISOString()
+                };
+
+                await fetch(`${API_BASE}/api/projects`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(snapshotPayload)
+                });
+                setStatus('项目已保存到数据库', 'saved');
+            } catch (e) {
+                console.warn('saveProject db sync failed:', e);
+                setStatus('项目已保存（本地），数据库同步失败', '');
+            }
+
+            // 4. 同步保留原有：导出 .sdocproj（作为本地备份/离线迁移）
+            ProjectManager.export();
+        }
+
+        function handleExportXML() {
+            //检查信息是否已经填写完整
+            if (isProjectInfoComplete()) {
+                // 跳转导出页前做一次兜底保存，确保最新标注可被导出页读取
+                AppState.save();
+                // 如果信息已输入，按原计划跳转到导出页面
+                window.location.href = 'exportXml.html';
+            } else {
+                // 如果信息不完整，提示并自动打开“新建”弹窗
+                alert('请先完善项目基本信息（标题、作者、朝代等）');
+                createNewProject();
+            }
+        }
+
+
+        // ===== 撤销/重做 =====
+        function saveUndoState() {
+            undoStack.push(JSON.stringify(AppState.annotations));
+            redoStack = [];
+        }
+
+        function undoAction() {
+            if (undoStack.length === 0) return;
+            redoStack.push(JSON.stringify(AppState.annotations));
+            AppState.annotations = JSON.parse(undoStack.pop());
+            selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            clearPropertyPanel();
+            collabEmitAnnotationsReplace();
+            markAsModified();
+        }
+
+        function redoAction() {
+            if (redoStack.length === 0) return;
+            undoStack.push(JSON.stringify(AppState.annotations));
+            AppState.annotations = JSON.parse(redoStack.pop());
+            selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            clearPropertyPanel();
+            collabEmitAnnotationsReplace();
+            markAsModified();
+        }
+
+        // ===== UI更新 =====
+        function updateUI() {
+            updateThumbnailList();
+            updatePageNavButtons();
+            updatePageIndicator();
+            updateAnnotationList();
+            updateCustomCharsGrid();
+            updateStatusBar();
+
+            if (AppState.pages.length > 0) {
+                loadPage(AppState.currentPageIndex);
+            } else {
+                showEmptyState();
+            }
+        }
+
+        function updateStatusBar() {
+            document.getElementById('statusPage').textContent =
+                AppState.pages.length > 0 ? `${AppState.currentPageIndex + 1}/${AppState.pages.length}` : '-';
+            document.getElementById('statusAnnotations').textContent = AppState.annotations.length;
+        }
+
+        function updateCustomCharsGrid() {
+            const container = document.getElementById('customCharsGrid');
+            document.getElementById('customCharCount').textContent = AppState.customChars.length + '个';
+
+            if (AppState.customChars.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 12px; color: var(--color-text-light); font-size: 11px;">暂无造字</div>';
+                return;
+            }
+
+            container.innerHTML = AppState.customChars.map(char => `
+                <div class="custom-char-item" title="${char.name}">
+                    <img src="${char.imageData}" alt="${char.name}" onclick="useCustomChar('${char.id}')">
+                    <button class="custom-char-delete" onclick="event.stopPropagation(); deleteCustomChar('${char.id}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+
+        }
+
+        function deleteCustomChar(charId) {
+            // 从全局状态中移除指定造字
+            AppState.customChars = AppState.customChars.filter(c => c.id !== charId);
+            AppState.save();                // 保存到 localStorage
+            updateCustomCharsGrid();        // 刷新造字列表
+            setStatus('造字已删除');       // 可选：更新底部状态栏提示
+        }
+
+        function useCustomChar(charId) {
+            const char = AppState.customChars.find(c => c.id === charId);
+            if (char && selectedAnnotation) {
+                selectedAnnotation.simplifiedChar = char.name;
+                updatePropertyPanel();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        function markAsModified() {
+            AppState.save();
+            document.getElementById('statusDot').classList.add('modified');
+            document.getElementById('statusText').textContent = '已修改';
+        }
+
+        function setStatus(text, type) {
+            document.getElementById('statusText').textContent = text;
+            if (type === 'saved') {
+                document.getElementById('statusDot').classList.remove('modified');
+            }
+        }
+
+        function showEmptyState() {
+            document.getElementById('emptyState').style.display = 'flex';
+            document.getElementById('canvasWrapper').style.display = 'none';
+        }
+
+        function hideEmptyState() {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('canvasWrapper').style.display = 'block';
+        }
+
+        function clearCanvases() {
+            if (mainCtx) mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            if (annotationCtx) annotationCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+            if (interactionCtx) interactionCtx.clearRect(0, 0, interactionCanvas.width, interactionCanvas.height);
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', init);
+
+        <!--附加内容-->
+        function checkProjectInfoComplete() {
+            if (!AppState.project ||
+                !AppState.project.title ||
+                !AppState.project.author ||
+                !AppState.project.dynasty) {
+                return false;
+            }
+            return true;
+        }
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .inland-security-footer {
+            position: fixed;
+            z-index: 10;
+            bottom: 0;
+            right: 0;
+            width: fit-content;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .tooltip-container {
+            position: relative;
+        }
+
+        .trigger-content {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            background-color: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .minimax-link {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 300;
+            color: #adadad;
+            text-decoration: none;
+        }
+
+        .minimax-link:visited {
+            color: #adadad;
+        }
+
+        .minimax-link:hover {
+            color: #666666;
+        }
+
+        .tooltip-content {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            padding-bottom: 16px;
+            /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+            font-size: 12px;
+            line-height: 17px;
+            background-color: #fafafa;
+            border-radius: 12px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            color: #171717;
+        }
+
+        /* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            right: 0;
+            height: 16px;
+        }
+
+        .tooltip-container:hover .tooltip-content {
+            display: flex;
+        }
+
+        .info-section {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .beian-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: #171717;
+        }
+
+        .beian-icon {
+            width: 14px;
+            height: 14px;
+            margin-right: 2px;
+        }
+
+        .underline-text {
+            color: #171717;
+            text-decoration: underline;
+        }
+
+        .underline-text:hover {
+            color: #000000;
+        }
+
+        /* 深色模式支持 */
+        @media (prefers-color-scheme: dark) {
+            .trigger-content {
+                background-color: transparent;
+            }
+
+            .minimax-link,
+            .minimax-link:visited {
+                color: #666666;
+            }
+
+            .minimax-link:hover {
+                color: #adadad;
+            }
+
+            .tooltip-content {
+                background-color: #262626;
+                color: #ededed;
+            }
+
+            .beian-link,
+            .underline-text {
+                color: #ededed;
+            }
+
+            .underline-text:hover {
+                color: #ffffff;
+            }
+        }
+    </style>
+
+
+</body>
+
+</html>
