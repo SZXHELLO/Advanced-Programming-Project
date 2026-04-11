@@ -1,0 +1,288 @@
+/**
+ * 与 createChar.html 一致的表单/内容页表面样式
+ */
+.surface-page-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-md);
+}
+
+.surface-inner {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.surface-inner--narrow {
+    max-width: 560px;
+}
+
+.surface-page-header {
+    margin-bottom: var(--space-md);
+}
+
+.surface-page-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--color-ink);
+    margin-bottom: var(--space-xs);
+}
+
+.surface-page-desc {
+    color: var(--color-text-light);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.surface-card {
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.surface-section-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-ink);
+    margin-bottom: var(--space-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.surface-section-title svg {
+    width: 18px;
+    height: 18px;
+    color: var(--color-cinnabar);
+    flex-shrink: 0;
+}
+
+.surface-tips {
+    background: #FFF9E6;
+    border: 1px solid #F0E0B0;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.surface-tips-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8B6914;
+    margin-bottom: var(--space-xs);
+}
+
+.surface-form-group {
+    margin-bottom: var(--space-sm);
+}
+
+.surface-form-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-light);
+    margin-bottom: var(--space-xs);
+}
+
+.surface-form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.surface-input,
+.surface-select,
+.surface-textarea {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--color-text);
+    width: 100%;
+    max-width: 100%;
+    transition: border-color var(--transition-fast);
+}
+
+.surface-input:focus,
+.surface-select:focus,
+.surface-textarea:focus {
+    outline: none;
+    border-color: var(--color-azurite);
+}
+
+.surface-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.surface-muted {
+    color: var(--color-text-light);
+    font-size: 13px;
+}
+
+.surface-link {
+    color: var(--color-azurite);
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.surface-link:hover {
+    text-decoration: underline;
+}
+
+.surface-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+/* Tabs aligned with surface */
+.surface-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.surface-tab-btn {
+    padding: 8px 14px;
+    border: 1px solid var(--color-border);
+    background: #fff;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text);
+    font-family: inherit;
+    transition: all var(--transition-fast);
+}
+
+.surface-tab-btn:hover {
+    border-color: var(--color-cinnabar);
+    color: var(--color-cinnabar);
+}
+
+.surface-tab-btn.active {
+    border-color: var(--color-cinnabar);
+    background: var(--color-cinnabar);
+    color: #fff;
+    font-weight: 600;
+}
+
+.surface-tab-panel {
+    display: none;
+}
+
+.surface-tab-panel.active {
+    display: block;
+}
+
+.surface-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #fff;
+}
+
+.surface-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.surface-data-table th,
+.surface-data-table td {
+    border-bottom: 1px solid var(--color-border);
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.surface-data-table th {
+    background: var(--color-paper);
+    font-weight: 600;
+    color: var(--color-ink);
+    font-family: 'Noto Serif SC', serif;
+    font-size: 12px;
+}
+
+.surface-data-table tr:last-child td {
+    border-bottom: none;
+}
+
+.surface-btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--color-text);
+}
+
+.surface-btn-sm:hover {
+    border-color: var(--color-azurite);
+    color: var(--color-azurite);
+}
+
+.surface-btn-sm.danger:hover {
+    border-color: var(--color-cinnabar);
+    color: var(--color-cinnabar);
+}
+
+.surface-status-block {
+    text-align: center;
+    padding: var(--space-xl);
+}
+
+.surface-status-block h2,
+.surface-status-block h3 {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 18px;
+    color: var(--color-ink);
+    margin-bottom: var(--space-sm);
+}
+
+.join-state-loading {
+    color: var(--color-text-light);
+    font-size: 14px;
+}
+
+/* 与 common .page-container 配合：允许长内容页纵向滚动 */
+main.page-container.surface-scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 顶栏面包屑（深色 top-nav 内） */
+.nav-links.nav-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    row-gap: 4px;
+}
+
+.nav-breadcrumb-sep {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.45);
+    user-select: none;
+    padding: 0 2px;
+}
+
+.nav-breadcrumb-current {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.95);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+}

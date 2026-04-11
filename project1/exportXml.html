@@ -574,9 +574,13 @@
 
             // 先把导出的 XML 落库，失败不阻断本地下载
             try {
+                const headers = Object.assign(
+                    { "Content-Type": "application/json" },
+                    window.Auth && window.Auth.getAuthHeaders ? window.Auth.getAuthHeaders() : {}
+                );
                 await fetch(`${API_BASE}/api/exports`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers,
                     body: JSON.stringify({
                         projectId: AppState.project?.id || null,
                         exportType: "xml",

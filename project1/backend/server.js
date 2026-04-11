@@ -1,22 +1,49 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
 const imageSize = require('image-size');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
 const http = require('http');
 const { WebSocketServer, WebSocket } = require('ws');
 require('dotenv').config();
 
 const { createPool, initDb } = require('./db');
 const { parseDataUrl, bufferToDataUrl } = require('./utils/dataUrl');
+const { logActivity } = require('./utils/activityLogger');
+const {
+  issueSession,
+  getSessionFromRequest,
+  getSessionById,
+  sessionStore,
+} = require('./sessionService');
+const {
+  projectRooms,
+  getOrCreateRoom,
+  buildPresenceMembers,
+  publishRoomPresence,
+  broadcastToRoom,
+  disconnectUserSocketsForProject,
+} = require('./collabRooms');
+const createProjectManagementRouter = require('./routes/projectManagement');
 
 const app = express();
 
 // JSON 体积可能会很大（项目快照中含 base64 图片/字库图形）
 app.use(express.json({ limit: '120mb' }));
 app.use(cors({ origin: '*', credentials: true }));
+
+// 托管前端静态资源（join.html、css、js 等），使邀请链接可使用与 API 相同的主机端口
+const FRONTEND_ROOT = path.join(__dirname, '..');
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  const p = req.path || '';
+  if (p === '/backend' || p.startsWith('/backend/')) return res.status(404).end();
+  if (p.startsWith('/.git') || p.startsWith('/node_modules/')) return res.status(404).end();
+  next();
+});
+app.use(express.static(FRONTEND_ROOT, { index: 'index.html' }));
 
 // 上传走内存（OCR/分辨率获取不落盘）
 const upload = multer({
@@ -25,135 +52,35 @@ const upload = multer({
 });
 
 let pool;
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-const sessionStore = new Map();
-const projectRooms = new Map();
 let wss = null;
 
-function normalizePermissions(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
-  }
-  return [];
+async function getProjectMemberRole(projectId, userId) {
+  const [rows] = await pool.query(
+    'SELECT role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1',
+    [String(projectId), userId]
+  );
+  return rows[0]?.role || null;
 }
 
-function issueSession(user) {
-  const sessionId = crypto.randomUUID();
-  const payload = {
-    sessionId,
-    userId: user.user_id,
-    username: user.username,
-    displayName: user.display_name || user.username,
-    role: user.role || 'editor',
-    permissions: normalizePermissions(user.permissions),
-    expiresAt: Date.now() + SESSION_TTL_MS,
-  };
-  sessionStore.set(sessionId, payload);
-  return payload;
-}
-
-function getSessionFromRequest(req) {
-  const authHeader = String(req.headers.authorization || '');
-  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const sessionId = bearer || String(req.query.sessionId || '');
-  if (!sessionId) return null;
-
-  const session = sessionStore.get(sessionId);
-  if (!session) return null;
-  if (Date.now() > session.expiresAt) {
-    sessionStore.delete(sessionId);
-    return null;
-  }
-  return session;
-}
-
-function getSessionById(sessionId) {
-  if (!sessionId) return null;
-  const session = sessionStore.get(String(sessionId));
-  if (!session) return null;
-  if (Date.now() > session.expiresAt) {
-    sessionStore.delete(String(sessionId));
-    return null;
-  }
-  return session;
-}
-
-function getOrCreateRoom(projectId) {
-  const key = String(projectId);
-  if (!projectRooms.has(key)) {
-    projectRooms.set(key, new Map());
-  }
-  return projectRooms.get(key);
-}
-
-function getRoomOnlineMembers(projectId) {
-  const room = projectRooms.get(String(projectId));
-  if (!room) return [];
-  return Array.from(room.values());
-}
-
-function buildPresenceMembers(projectId) {
-  const members = getRoomOnlineMembers(projectId).filter((m) => (
-    m &&
-    m.username &&
-    m.socket &&
-    m.socket.readyState === WebSocket.OPEN
-  ));
-  const byUsername = new Map();
-  members.forEach((m) => {
-    const key = String(m.username || '').trim();
-    if (!key || byUsername.has(key)) return;
-    byUsername.set(key, {
-      sessionId: m.sessionId,
-      userId: m.userId,
-      displayName: m.displayName,
-      username: m.username
-    });
-  });
-  return Array.from(byUsername.values());
-}
-
-function publishRoomPresence(projectId) {
-  const room = projectRooms.get(String(projectId));
-  if (!room) return;
-  const members = buildPresenceMembers(projectId);
-  const payload = JSON.stringify({
-    type: 'presence',
-    projectId: String(projectId),
-    onlineCount: members.length,
-    users: members
-  });
-
-  room.forEach((member) => {
-    if (member.socket && member.socket.readyState === WebSocket.OPEN) {
-      member.socket.send(payload);
-    }
-  });
-}
-
-function broadcastToRoom(projectId, senderSessionId, eventBody) {
-  const room = projectRooms.get(String(projectId));
-  if (!room) return;
-  const payload = JSON.stringify(eventBody);
-  room.forEach((member) => {
-    if (member.sessionId === senderSessionId) return;
-    if (member.socket && member.socket.readyState === WebSocket.OPEN) {
-      member.socket.send(payload);
-    }
-  });
-}
+const VIEWER_BLOCKED_TYPES = new Set([
+  'drawing_preview',
+  'annotation_add',
+  'page_add',
+  'page_delete',
+  'pages_replace',
+  'annotations_add_many',
+  'annotation_update',
+  'annotation_delete',
+  'annotations_replace',
+  'page_sync_request',
+  'page_sync_snapshot',
+]);
 
 function setupCollabWebSocket(server) {
   wss = new WebSocketServer({ server, path: '/ws/collab' });
 
   wss.on('connection', (socket, req) => {
+    (async () => {
     try {
       const url = new URL(req.url, 'http://localhost');
       const sessionId = String(url.searchParams.get('sessionId') || '').trim();
@@ -164,12 +91,19 @@ function setupCollabWebSocket(server) {
         return;
       }
 
+      const userRole = await getProjectMemberRole(projectId, session.userId);
+      if (!userRole) {
+        socket.close(4403, 'forbidden');
+        return;
+      }
+
       const room = getOrCreateRoom(projectId);
       room.set(sessionId, {
         sessionId,
         userId: session.userId,
         username: session.username,
         displayName: session.displayName || session.username,
+        userRole,
         socket
       });
 
@@ -177,9 +111,20 @@ function setupCollabWebSocket(server) {
         type: 'joined',
         projectId,
         sessionId,
-        displayName: session.displayName || session.username
+        displayName: session.displayName || session.username,
+        userRole
       }));
       publishRoomPresence(projectId);
+
+      const wsLog = (actionType, actionDetail) => {
+        logActivity(pool, {
+          projectId,
+          userId: session.userId,
+          actionType,
+          actionDetail: actionDetail || {},
+          req: null,
+        }).catch((e) => console.error('collab activity log:', e?.message || e));
+      };
 
       socket.on('message', (raw) => {
         let data;
@@ -190,6 +135,13 @@ function setupCollabWebSocket(server) {
         }
         const type = String(data?.type || '');
         if (!type) return;
+
+        if (userRole === 'viewer' && VIEWER_BLOCKED_TYPES.has(type)) {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'error', message: '您是只读成员，无法编辑' }));
+          }
+          return;
+        }
 
         if (type === 'leave') {
           const targetRoom = projectRooms.get(projectId);
@@ -228,6 +180,10 @@ function setupCollabWebSocket(server) {
             fromSessionId: sessionId,
             displayName: session.displayName || session.username,
             annotation: data.annotation || null
+          });
+          wsLog('annotation_added', {
+            pageIndex: data.annotation?.pageIndex,
+            text: String(data.annotation?.text || '').slice(0, 100),
           });
           return;
         }
@@ -271,6 +227,7 @@ function setupCollabWebSocket(server) {
             pages,
             version
           });
+          wsLog('pages_replaced', { pageCount: pages.length });
           return;
         }
 
@@ -293,6 +250,10 @@ function setupCollabWebSocket(server) {
             displayName: session.displayName || session.username,
             annotation: data.annotation || null
           });
+          wsLog('annotation_updated', {
+            annotationId: data.annotation?.id || data.annotationId,
+            changes: data.changes || {},
+          });
           return;
         }
 
@@ -303,6 +264,7 @@ function setupCollabWebSocket(server) {
             fromSessionId: sessionId,
             annotationId: data.annotationId || null
           });
+          wsLog('annotation_deleted', { annotationId: data.annotationId });
           return;
         }
 
@@ -355,6 +317,7 @@ function setupCollabWebSocket(server) {
       console.error('ws connection failed:', err?.message || err);
       socket.close(1011, 'server-error');
     }
+    })();
   });
 }
 
@@ -725,10 +688,82 @@ app.delete('/api/custom-chars/:id', async (req, res) => {
 // --------------------------
 app.post('/api/projects', async (req, res) => {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return res.status(401).json({ error: '未登录或会话已失效' });
+    }
+
     const { project, pages, annotations, customChars, exportedAt } = req.body || {};
     if (!project?.id) return res.status(400).json({ error: 'Missing project.id' });
 
     const projectId = String(project.id);
+    const [existing] = await pool.query(
+      'SELECT project_id FROM projects WHERE project_id = ? LIMIT 1',
+      [projectId]
+    );
+
+    if (!existing.length) {
+      await pool.query(
+        `
+        INSERT INTO projects (project_id, title, author, dynasty, book, volume, owner_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          projectId,
+          project.title || '',
+          project.author || '',
+          project.dynasty || '',
+          project.book || '',
+          project.volume || '',
+          session.userId,
+        ]
+      );
+      await pool.query(
+        `
+        INSERT INTO project_members (project_id, user_id, role, invited_by)
+        VALUES (?, ?, 'admin', NULL)
+        `,
+        [projectId, session.userId]
+      );
+      await logActivity(pool, {
+        projectId,
+        userId: session.userId,
+        actionType: 'project_created',
+        actionDetail: { projectName: project.title || projectId },
+        req,
+      });
+    } else {
+      const role = await getProjectMemberRole(projectId, session.userId);
+      if (!role) {
+        return res.status(403).json({ error: '无权访问此项目' });
+      }
+      if (!['admin', 'editor'].includes(role)) {
+        return res.status(403).json({ error: '无编辑权限' });
+      }
+      await pool.query(
+        `
+        UPDATE projects SET
+          title = ?, author = ?, dynasty = ?, book = ?, volume = ?
+        WHERE project_id = ?
+        `,
+        [
+          project.title || '',
+          project.author || '',
+          project.dynasty || '',
+          project.book || '',
+          project.volume || '',
+          projectId,
+        ]
+      );
+      await logActivity(pool, {
+        projectId,
+        userId: session.userId,
+        actionType: 'project_updated',
+        actionDetail: { saved: true },
+        req,
+      });
+    }
+
     const snapshot = {
       project,
       pages: Array.isArray(pages) ? pages : [],
@@ -738,27 +773,6 @@ app.post('/api/projects', async (req, res) => {
     };
 
     const snapshotJson = JSON.stringify(snapshot);
-
-    await pool.query(
-      `
-      INSERT INTO projects (project_id, title, author, dynasty, book, volume)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        title = VALUES(title),
-        author = VALUES(author),
-        dynasty = VALUES(dynasty),
-        book = VALUES(book),
-        volume = VALUES(volume)
-      `,
-      [
-        projectId,
-        project.title || '',
-        project.author || '',
-        project.dynasty || '',
-        project.book || '',
-        project.volume || '',
-      ]
-    );
 
     const [result] = await pool.query(
       'INSERT INTO project_snapshots (project_id, snapshot_json) VALUES (?, ?)',
@@ -775,7 +789,14 @@ app.post('/api/projects', async (req, res) => {
 
 app.get('/api/projects', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return res.status(401).json({ error: '未登录或会话已失效' });
+    }
+
+    const uid = session.userId;
+
+    const [memberRows] = await pool.query(
       `
       SELECT
         p.project_id,
@@ -785,8 +806,12 @@ app.get('/api/projects', async (req, res) => {
         p.book,
         p.volume,
         s.snapshot_id,
-        s.created_at AS saved_at
+        s.created_at AS saved_at,
+        pm.role AS user_role,
+        (SELECT COUNT(*) FROM project_join_requests jr
+         WHERE jr.project_id = p.project_id AND jr.status = 'pending') AS pending_requests_count
       FROM projects p
+      INNER JOIN project_members pm ON pm.project_id = p.project_id AND pm.user_id = ?
       JOIN (
         SELECT project_id, MAX(snapshot_id) AS latest_snapshot_id
         FROM project_snapshots
@@ -794,9 +819,62 @@ app.get('/api/projects', async (req, res) => {
       ) latest ON latest.project_id = p.project_id
       JOIN project_snapshots s ON s.snapshot_id = latest.latest_snapshot_id
       ORDER BY s.created_at DESC
-      `
+      `,
+      [uid]
     );
-    return res.json({ projects: rows });
+
+    const [publicRows] = await pool.query(
+      `
+      SELECT
+        p.project_id,
+        p.title,
+        p.author,
+        p.dynasty,
+        p.book,
+        p.volume,
+        p.allow_join_requests,
+        s.snapshot_id,
+        s.created_at AS saved_at,
+        (SELECT COUNT(*) FROM project_join_requests jr
+         WHERE jr.project_id = p.project_id AND jr.status = 'pending') AS pending_requests_count
+      FROM projects p
+      JOIN (
+        SELECT project_id, MAX(snapshot_id) AS latest_snapshot_id
+        FROM project_snapshots
+        GROUP BY project_id
+      ) latest ON latest.project_id = p.project_id
+      JOIN project_snapshots s ON s.snapshot_id = latest.latest_snapshot_id
+      WHERE p.is_public = 1
+        AND NOT EXISTS (
+          SELECT 1 FROM project_members pm
+          WHERE pm.project_id = p.project_id AND pm.user_id = ?
+        )
+      ORDER BY s.created_at DESC
+      LIMIT 200
+      `,
+      [uid]
+    );
+
+    const mapRow = (r, fromPublicListing) => ({
+      project_id: r.project_id,
+      title: r.title,
+      author: r.author,
+      dynasty: r.dynasty,
+      book: r.book,
+      volume: r.volume,
+      snapshot_id: r.snapshot_id,
+      saved_at: r.saved_at,
+      userRole: r.user_role != null ? r.user_role : null,
+      pendingRequestsCount: Number(r.pending_requests_count || 0),
+      fromPublicListing: Boolean(fromPublicListing),
+      allowJoinRequests: fromPublicListing ? Boolean(Number(r.allow_join_requests)) : undefined,
+    });
+
+    const projects = [...memberRows.map((r) => mapRow(r, false)), ...publicRows.map((r) => mapRow(r, true))].sort(
+      (a, b) => new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime()
+    );
+
+    return res.json({ projects });
   } catch (err) {
     console.error('list projects failed:', err?.message || err);
     return res.status(500).json({ error: err?.message || 'Failed to list projects' });
@@ -805,7 +883,16 @@ app.get('/api/projects', async (req, res) => {
 
 app.get('/api/projects/:projectId/latest', async (req, res) => {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return res.status(401).json({ error: '未登录或会话已失效' });
+    }
     const projectId = String(req.params.projectId);
+    const userRole = await getProjectMemberRole(projectId, session.userId);
+    if (!userRole) {
+      return res.status(403).json({ error: '无权访问此项目' });
+    }
+
     const [rows] = await pool.query(
       `
       SELECT snapshot_id, snapshot_json, created_at
@@ -817,6 +904,12 @@ app.get('/api/projects/:projectId/latest', async (req, res) => {
       [projectId]
     );
     if (!rows.length) return res.status(404).json({ error: 'Project snapshot not found' });
+
+    const [projRows] = await pool.query(
+      'SELECT is_public, allow_join_requests FROM projects WHERE project_id = ? LIMIT 1',
+      [projectId]
+    );
+    const projFlags = projRows[0] || {};
 
     let snapshot;
     try {
@@ -834,6 +927,9 @@ app.get('/api/projects/:projectId/latest', async (req, res) => {
       annotations: Array.isArray(snapshot.annotations) ? snapshot.annotations : [],
       customChars: Array.isArray(snapshot.customChars) ? snapshot.customChars : [],
       exportedAt: snapshot.exportedAt || null,
+      userRole,
+      isPublic: Boolean(projFlags.is_public),
+      allowJoinRequests: Boolean(projFlags.allow_join_requests),
     });
   } catch (err) {
     console.error('get latest project failed:', err?.message || err);
@@ -843,7 +939,16 @@ app.get('/api/projects/:projectId/latest', async (req, res) => {
 
 app.get('/api/projects/:projectId/download', async (req, res) => {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return res.status(401).json({ error: '未登录或会话已失效' });
+    }
     const projectId = String(req.params.projectId);
+    const userRole = await getProjectMemberRole(projectId, session.userId);
+    if (!userRole) {
+      return res.status(403).json({ error: '无权访问此项目' });
+    }
+
     const [rows] = await pool.query(
       `
       SELECT snapshot_json
@@ -856,10 +961,19 @@ app.get('/api/projects/:projectId/download', async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'Project snapshot not found' });
 
+    const raw = rows[0].snapshot_json || '{}';
+    await logActivity(pool, {
+      projectId,
+      userId: session.userId,
+      actionType: 'project_exported',
+      actionDetail: { format: 'sdocproj', fileSize: Buffer.byteLength(raw, 'utf8') },
+      req,
+    });
+
     const fileName = `${projectId}.sdocproj`;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-    return res.send(rows[0].snapshot_json || '{}');
+    return res.send(raw);
   } catch (err) {
     console.error('download project failed:', err?.message || err);
     return res.status(500).json({ error: err?.message || 'Failed to download project' });
@@ -868,8 +982,20 @@ app.get('/api/projects/:projectId/download', async (req, res) => {
 
 app.delete('/api/projects', async (req, res) => {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return res.status(401).json({ error: '未登录或会话已失效' });
+    }
+
     const ids = Array.isArray(req.body?.projectIds) ? req.body.projectIds.map(String) : [];
     if (!ids.length) return res.status(400).json({ error: 'projectIds is required' });
+
+    for (const id of ids) {
+      const role = await getProjectMemberRole(id, session.userId);
+      if (role !== 'admin') {
+        return res.status(403).json({ error: `无权删除项目：${id}` });
+      }
+    }
 
     const placeholders = ids.map(() => '?').join(', ');
     const [result] = await pool.query(
@@ -889,6 +1015,11 @@ app.delete('/api/projects', async (req, res) => {
 // --------------------------
 app.post('/api/exports', async (req, res) => {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return res.status(401).json({ error: '未登录或会话已失效' });
+    }
+
     const { projectId, exportType, xmlContent } = req.body || {};
     if (!xmlContent) return res.status(400).json({ error: 'Missing xmlContent' });
 
@@ -897,6 +1028,20 @@ app.post('/api/exports', async (req, res) => {
 
     let pid = projectId ? String(projectId) : null;
     if (pid === 'null' || pid === 'undefined') pid = null;
+
+    if (pid) {
+      const role = await getProjectMemberRole(pid, session.userId);
+      if (!role) {
+        return res.status(403).json({ error: '无权关联此导出到项目' });
+      }
+      await logActivity(pool, {
+        projectId: pid,
+        userId: session.userId,
+        actionType: 'project_exported',
+        actionDetail: { format: type, fileSize: Buffer.byteLength(xml, 'utf8') },
+        req,
+      });
+    }
 
     const [result] = await pool.query(
       'INSERT INTO exports (project_id, export_type, xml_content) VALUES (?, ?, ?)',
@@ -947,6 +1092,8 @@ app.get('/api/collab/status', (req, res) => {
 async function main() {
   pool = createPool();
   await initDb(pool);
+
+  app.use('/api', createProjectManagementRouter(pool, { disconnectUserSocketsForProject }));
 
   const port = process.env.PORT ? Number(process.env.PORT) : 8000;
   const server = http.createServer(app);

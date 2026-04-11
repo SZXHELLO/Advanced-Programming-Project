@@ -231,6 +231,15 @@ const Auth = {
         if (redirectToLogin) {
             Navigation.go('login.html');
         }
+    },
+
+    getAuthHeaders(extra = {}) {
+        const session = this.getSession();
+        const headers = { ...extra };
+        if (session?.sessionId) {
+            headers.Authorization = `Bearer ${session.sessionId}`;
+        }
+        return headers;
     }
 };
 

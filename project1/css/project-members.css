@@ -1,0 +1,200 @@
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border, #ddd);
+  padding-bottom: 8px;
+}
+
+.tab-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--color-border, #ddd);
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tab-btn.active {
+  border-color: var(--color-cinnabar, #C84A32);
+  /* color: var(--color-azurite, #2b5f8e); */
+  color: #fff;
+  font-weight: 600;
+}
+
+.tab-panel,
+.surface-tab-panel {
+  display: none;
+}
+
+.tab-panel.active,
+.surface-tab-panel.active {
+  display: block;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid var(--color-border-light, #eee);
+  padding: 8px;
+  text-align: left;
+}
+
+.badge {
+  display: inline-block;
+  background: #c84a32;
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.request-card {
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.timeline-item {
+  border-left: 2px solid var(--color-border, #ddd);
+  padding-left: 12px;
+  margin-bottom: 12px;
+}
+
+
+
+/* ========== 新建链接表单样式优化 ========== */
+
+.link-form-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 20px;
+  background: #fafbfc;
+  border-radius: 8px;
+  border: 1px solid #e1e4e8;
+}
+
+/* 表单字段 */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+/* 输入框组 */
+.input-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.input-group .surface-input {
+  flex: 0 0 100px;
+  min-width: 80px;
+}
+
+/* 复选框标签 */
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-label:hover {
+  color: var(--color-azurite, #2b5f8e);
+}
+
+/* 带单位的输入框 */
+.input-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-with-unit .surface-input {
+  flex: 0 0 100px;
+  min-width: 80px;
+}
+
+.input-unit {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* 操作按钮区域 */
+.form-actions {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+
+.btn-block {
+  width: 100%;
+  max-width: 300px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .link-form-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .form-actions {
+    margin-top: 4px;
+  }
+
+  .btn-block {
+    max-width: 100%;
+  }
+
+  .input-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .input-group .surface-input {
+    width: 100%;
+    max-width: 200px;
+  }
+}
+
+/* 当复选框选中时禁用输入框 */
+#link-unlimited:checked~.surface-input,
+#link-unlimited:checked+.surface-input {
+  opacity: 0.5;
+  pointer-events: none;
+}

@@ -377,6 +377,7 @@
                 <ul class="tips-list">
                     <li>在画布上绘制汉字字形，可以使用画笔或橡皮擦工具</li>
                     <li>保存后，新造字将同步到编辑页供使用</li>
+                    <li>「截图取字」将打开编辑页：请先在编辑页打开含页面图像的项目，框选后自动返回并填入画布与预览</li>
                 </ul>
             </div>
 
@@ -425,6 +426,15 @@
                                 <path
                                     d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
                                 </path>
+                            </svg>
+                        </button>
+                        <div style="width: 1px; height: 24px; background: var(--color-border); margin: 0 4px;"></div>
+                        <button type="button" class="char-tool-btn" onclick="goEditScreenshotChar()" title="截图取字"
+                            data-tooltip="截图取字">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
                             </svg>
                         </button>
                     </div>
@@ -519,7 +529,7 @@
     <footer class="statusbar">
         <div class="status-item">
             <span class="status-dot"></span>
-            <span>造字页面</span>
+            <span id="statusBarLabel">造字页面</span>
         </div>
         <div class="status-item">
             <span>已造字数: </span>
@@ -535,6 +545,40 @@
         let charTool = 'brush';
         let brushSize = 8;
         const API_BASE = window.SDOC_API_BASE || "http://localhost:8000";
+
+        function goEditScreenshotChar() {
+            location.href = 'edit.html?screenshotChar=1';
+        }
+
+        function applyScreenshotCharFromSession() {
+            try {
+                const raw = sessionStorage.getItem('SDOC_SCREENSHOT_CHAR_RESULT');
+                if (!raw) return;
+                sessionStorage.removeItem('SDOC_SCREENSHOT_CHAR_RESULT');
+                const parsed = JSON.parse(raw);
+                const dataUrl = parsed && parsed.dataUrl;
+                if (!dataUrl || !charCanvas || !charCtx) return;
+                const img = new Image();
+                img.onload = () => {
+                    charCtx.fillStyle = '#fff';
+                    charCtx.fillRect(0, 0, charCanvas.width, charCanvas.height);
+                    const sc = Math.min(charCanvas.width / img.width, charCanvas.height / img.height);
+                    const dw = img.width * sc;
+                    const dh = img.height * sc;
+                    const ox = (charCanvas.width - dw) / 2;
+                    const oy = (charCanvas.height - dh) / 2;
+                    charCtx.drawImage(img, ox, oy, dw, dh);
+                    setCharTool(charTool);
+                    updateCharPreview();
+                    const lab = document.getElementById('statusBarLabel');
+                    if (lab) lab.textContent = '已从编辑页截图填入';
+                };
+                img.onerror = () => { };
+                img.src = dataUrl;
+            } catch (e) {
+                console.warn('applyScreenshotCharFromSession:', e);
+            }
+        }
 
         async function deleteCustomChar(charId) {
             // 从全局状态中移除指定造字
@@ -611,6 +655,7 @@
             updateCharLibrary();
             updateUnicodeDisplay();
             updateCharPreview();
+            applyScreenshotCharFromSession();
             window.addEventListener('resize', resizeCanvas);
         }
 

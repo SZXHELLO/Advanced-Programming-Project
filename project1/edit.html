@@ -12,6 +12,30 @@
         rel="stylesheet">
     <link rel="stylesheet" href="css/common.css">
     <style>
+        /* 截图取字提示条 */
+        #sdoc-screenshot-char-banner {
+            position: fixed;
+            top: 56px;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background: #FFF9E6;
+            border-bottom: 1px solid #F0E0B0;
+            padding: 10px var(--space-md);
+            font-size: 13px;
+            color: #5c4a20;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .sdoc-screenshot-banner-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-md);
+        }
+
         /* 编辑页特有样式 */
         .edit-layout {
             display: flex;
@@ -642,7 +666,7 @@
             </a>
         </div>
         <div class="nav-spacer"></div>
-        <button class="btn btn-secondary" onclick="document.getElementById('importImageInput').click()">
+        <button type="button" class="btn btn-secondary sdoc-edit-control" onclick="document.getElementById('importImageInput').click()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                 <circle cx="8.5" cy="8.5" r="1.5"></circle>
@@ -650,7 +674,7 @@
             </svg>
             导入
         </button>
-        <button class="btn btn-primary" onclick="saveProject()">
+        <button type="button" class="btn btn-primary sdoc-edit-control" onclick="saveProject()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
                 <polyline points="17 21 17 13 7 13 7 21"></polyline>
@@ -672,7 +696,7 @@
                     项目
                 </h3>
                 <div class="project-actions">
-                    <button class="project-btn" onclick="createNewProject()">
+                    <button type="button" class="project-btn sdoc-edit-control" onclick="createNewProject()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <line x1="12" y1="18" x2="12" y2="12"></line>
@@ -680,15 +704,23 @@
                         </svg>
                         项目信息
                     </button>
-                    <button class="project-btn" onclick="document.getElementById('openProjectInput').click()">
+                    <button type="button" class="project-btn sdoc-edit-control" onclick="document.getElementById('openProjectInput').click()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
                             </path>
                         </svg>
                         打开
                     </button>
+                    <button type="button" class="project-btn" onclick="exitCurrentProjectEditing()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        退出当前项目
+                    </button>
                     <!-- <button class="project-btn" onclick="window.location.href='exportXml.html'"> -->
-                    <button class="project-btn" onclick="handleExportXML() ">
+                    <button type="button" class="project-btn" onclick="handleExportXML() ">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
@@ -803,13 +835,13 @@
                 </div>
 
                 <div class="tool-group">
-                    <button class="tool-btn" data-tooltip="撤销" onclick="undoAction()">
+                    <button type="button" class="tool-btn sdoc-edit-control" data-tooltip="撤销" onclick="undoAction()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M3 7v6h6"></path>
                             <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
                         </svg>
                     </button>
-                    <button class="tool-btn" data-tooltip="重做" onclick="redoAction()">
+                    <button type="button" class="tool-btn sdoc-edit-control" data-tooltip="重做" onclick="redoAction()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 7v6h-6"></path>
                             <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
@@ -1161,6 +1193,9 @@
         let currentSlashPreview = null;
         let undoStack = [];
         let redoStack = [];
+        let screenshotCharMode = false;
+        let screenshotSelecting = false;
+        let screenshotRectDraw = null;
         let pdfRangeResolver = null;
         let pdfRangeTotalPages = 0;
         const COLLAB_KEYS = {
@@ -1190,6 +1225,82 @@
             window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
         }
         const API_BASE = window.SDOC_API_BASE || "http://localhost:8000";
+        let currentProjectUserRole = 'editor';
+
+        function isViewerRole() {
+            return currentProjectUserRole === 'viewer';
+        }
+
+        async function refreshProjectRole() {
+            const pid = AppState.project && AppState.project.id;
+            if (!pid || !window.Auth || !window.Auth.isLoggedIn()) {
+                currentProjectUserRole = 'editor';
+                applyReadOnlyProjectUi();
+                return;
+            }
+            try {
+                const headers = window.Auth.getAuthHeaders ? window.Auth.getAuthHeaders() : {};
+                const resp = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(pid)}/latest`, { headers });
+                if (!resp.ok) {
+                    currentProjectUserRole = 'editor';
+                    applyReadOnlyProjectUi();
+                    return;
+                }
+                const data = await resp.json();
+                currentProjectUserRole = data.userRole || 'editor';
+                applyReadOnlyProjectUi();
+            } catch (_) {
+                currentProjectUserRole = 'editor';
+                applyReadOnlyProjectUi();
+            }
+        }
+
+        function applyReadOnlyProjectUi() {
+            const ro = currentProjectUserRole === 'viewer';
+            let banner = document.getElementById('sdoc-readonly-banner');
+            if (ro) {
+                if (!banner) {
+                    banner = document.createElement('div');
+                    banner.id = 'sdoc-readonly-banner';
+                    banner.style.cssText = 'background:#fff3cd;color:#856404;padding:8px 16px;text-align:center;font-size:13px;border-bottom:1px solid #ffc107;';
+                    banner.textContent = '您是只读成员，无法编辑此项目';
+                    document.body.insertBefore(banner, document.body.firstChild);
+                }
+                banner.style.display = 'block';
+            } else if (banner) {
+                banner.style.display = 'none';
+            }
+            document.querySelectorAll('.sdoc-edit-control').forEach((el) => {
+                if (el.tagName === 'BUTTON' || el.tagName === 'A') {
+                    if (ro) {
+                        el.setAttribute('disabled', 'disabled');
+                        el.style.opacity = '0.55';
+                        el.style.pointerEvents = 'none';
+                    } else {
+                        el.removeAttribute('disabled');
+                        el.style.opacity = '';
+                        el.style.pointerEvents = '';
+                    }
+                }
+            });
+            const simpIn = document.getElementById('simplifiedCharInput');
+            const noteIn = document.getElementById('annotationNoteInput');
+            if (simpIn) simpIn.disabled = ro;
+            if (noteIn) noteIn.disabled = ro;
+            document.querySelectorAll('#colorPicker .color-swatch').forEach((el) => {
+                el.style.pointerEvents = ro ? 'none' : '';
+                el.style.opacity = ro ? '0.55' : '';
+            });
+            document.querySelectorAll('.attr-type-btn').forEach((el) => {
+                if (ro) {
+                    el.setAttribute('disabled', 'disabled');
+                    el.style.opacity = '0.55';
+                } else {
+                    el.removeAttribute('disabled');
+                    el.style.opacity = '';
+                }
+            });
+        }
 
         // ===== 初始化 =====
         function init() {
@@ -1203,6 +1314,9 @@
                 interactionCtx = interactionCanvas.getContext('2d');
 
                 setupEventListeners();
+                if (screenshotCharMode && interactionCanvas) {
+                    interactionCanvas.style.cursor = 'crosshair';
+                }
                 updateUI();
                 initCollab();
             }
@@ -1213,7 +1327,7 @@
             interactionCanvas.addEventListener('mousedown', handleCanvasMouseDown);
             interactionCanvas.addEventListener('mousemove', handleCanvasMouseMove);
             interactionCanvas.addEventListener('mouseup', handleCanvasMouseUp);
-            interactionCanvas.addEventListener('mouseleave', handleCanvasMouseUp);
+            interactionCanvas.addEventListener('mouseleave', handleInteractionMouseLeave);
 
             document.getElementById('canvasContainer').addEventListener('wheel', handleWheelZoom);
             const leaveBtn = document.getElementById('collabLeaveBtn');
@@ -1222,6 +1336,49 @@
             }
             window.addEventListener('beforeunload', leaveCollabOnPageExit);
             window.addEventListener('pagehide', leaveCollabOnPageExit);
+        }
+
+        function initScreenshotCharUi() {
+            const p = new URLSearchParams(location.search);
+            if (p.get('screenshotChar') !== '1') return;
+            screenshotCharMode = true;
+            window.__SDOC_SCREENSHOT_CHAR_MODE = true;
+            const bar = document.createElement('div');
+            bar.id = 'sdoc-screenshot-char-banner';
+            bar.innerHTML = '<div class="sdoc-screenshot-banner-inner"><span><strong>截图取字</strong>：在页面图像上按住拖动框选字形，松开后将返回造字页并填入画布。</span><button type="button" class="btn btn-outline" style="padding:6px 12px;font-size:12px;flex-shrink:0;" id="sdoc-screenshot-cancel">取消</button></div>';
+            const nav = document.querySelector('.top-nav');
+            if (nav && nav.nextSibling) {
+                document.body.insertBefore(bar, nav.nextSibling);
+            } else {
+                document.body.insertBefore(bar, document.body.firstChild);
+            }
+            const cancel = document.getElementById('sdoc-screenshot-cancel');
+            if (cancel) cancel.addEventListener('click', cancelScreenshotCharMode);
+        }
+
+        function cancelScreenshotCharMode() {
+            screenshotCharMode = false;
+            window.__SDOC_SCREENSHOT_CHAR_MODE = false;
+            screenshotSelecting = false;
+            screenshotRectDraw = null;
+            const b = document.getElementById('sdoc-screenshot-char-banner');
+            if (b) b.remove();
+            const ic = document.getElementById('interactionLayer');
+            if (ic) ic.style.cursor = '';
+            try {
+                history.replaceState({}, '', location.pathname + (location.hash || ''));
+            } catch (_) { }
+            renderInteractionLayer();
+        }
+
+        function handleInteractionMouseLeave(e) {
+            if (screenshotCharMode && screenshotSelecting) {
+                screenshotSelecting = false;
+                screenshotRectDraw = null;
+                renderInteractionLayer();
+                return;
+            }
+            handleCanvasMouseUp(e);
         }
 
         function toWsBaseUrl(apiBase) {
@@ -1348,6 +1505,11 @@
                 return;
             }
 
+            if (payload.type === 'error' && payload.message) {
+                alert(payload.message);
+                return;
+            }
+
             if (payload.type === 'presence') {
                 collabOnlineCount = Number(payload.onlineCount || 1);
                 setCollabStatus(getCollabStatusText(collabOnlineCount), true);
@@ -1457,7 +1619,26 @@
             }
         }
 
+        function forceLeaveCollabMode() {
+            clearCollabTimers();
+            try {
+                if (collabWs && collabWs.readyState === WebSocket.OPEN) {
+                    collabWs.send(JSON.stringify({ type: 'leave' }));
+                }
+                if (collabWs) {
+                    collabWs.close();
+                }
+            } catch (_) { }
+            collabWs = null;
+            collabEnabled = false;
+            collabRemoteDrawings.clear();
+            Object.values(COLLAB_KEYS).forEach((k) => sessionStorage.removeItem(k));
+            setCollabStatus('多人编辑未开启', false);
+            renderInteractionLayer();
+        }
+
         function collabEmit(event) {
+            if (currentProjectUserRole === 'viewer') return;
             if (!collabEnabled || !collabWs || collabWs.readyState !== WebSocket.OPEN) return;
             collabWs.send(JSON.stringify(event));
         }
@@ -1768,6 +1949,9 @@
 
         // ===== 工具选择 =====
         function setTool(tool) {
+            if (currentProjectUserRole === 'viewer' && tool !== 'select') {
+                return;
+            }
             currentTool = tool;
             document.querySelectorAll('.tool-btn[id$="Tool"]').forEach(btn => {
                 btn.classList.remove('active');
@@ -1828,6 +2012,7 @@
 
         // ===== 属性类型选择 =====
         function selectAttrType(btn) {
+            if (isViewerRole()) return;
             document.querySelectorAll('.attr-type-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const selectedType = btn.dataset.type;
@@ -1863,6 +2048,7 @@
         }
         // ===== 颜色选择 =====
         function selectColor(el) {
+            if (isViewerRole()) return;
             document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
             el.classList.add('selected');
             currentColor = el.dataset.color;
@@ -1883,6 +2069,7 @@
 
         // ===== 标注类型选择 =====
         function selectMarkType(btn) {
+            if (isViewerRole()) return;
             document.querySelectorAll('.mark-type-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentMarkType = btn.dataset.type;
@@ -1905,6 +2092,19 @@
 
         // ===== 画布操作 =====
         function handleCanvasMouseDown(e) {
+            if (screenshotCharMode) {
+                if (!AppState.pages.length) {
+                    alert('当前没有页面图像，请先打开或导入含页面的项目后再截图取字。');
+                    return;
+                }
+                screenshotSelecting = true;
+                const crect = interactionCanvas.getBoundingClientRect();
+                const x = (e.clientX - crect.left) / zoom;
+                const y = (e.clientY - crect.top) / zoom;
+                screenshotRectDraw = { x, y, width: 0, height: 0 };
+                return;
+            }
+            if (currentProjectUserRole === 'viewer') return;
             if (!AppState.pages.length) return;
 
             const rect = interactionCanvas.getBoundingClientRect();
@@ -1933,6 +2133,15 @@
         }
 
         function handleCanvasMouseMove(e) {
+            if (screenshotCharMode && screenshotSelecting && screenshotRectDraw) {
+                const crect = interactionCanvas.getBoundingClientRect();
+                const x = (e.clientX - crect.left) / zoom;
+                const y = (e.clientY - crect.top) / zoom;
+                screenshotRectDraw.width = x - screenshotRectDraw.x;
+                screenshotRectDraw.height = y - screenshotRectDraw.y;
+                renderInteractionLayer();
+                return;
+            }
             if (!isDrawing) return;
 
             const rect = interactionCanvas.getBoundingClientRect();
@@ -1966,6 +2175,51 @@
         }
 
         function handleCanvasMouseUp(e) {
+            if (screenshotCharMode && screenshotSelecting) {
+                screenshotSelecting = false;
+                const crect = interactionCanvas.getBoundingClientRect();
+                const x = (e.clientX - crect.left) / zoom;
+                const y = (e.clientY - crect.top) / zoom;
+                if (!screenshotRectDraw) {
+                    renderInteractionLayer();
+                    return;
+                }
+                const rw = x - screenshotRectDraw.x;
+                const rh = y - screenshotRectDraw.y;
+                const norm = {
+                    x: rw > 0 ? screenshotRectDraw.x : screenshotRectDraw.x + rw,
+                    y: rh > 0 ? screenshotRectDraw.y : screenshotRectDraw.y + rh,
+                    width: Math.abs(rw),
+                    height: Math.abs(rh)
+                };
+                screenshotRectDraw = null;
+                renderInteractionLayer();
+                if (norm.width < 5 || norm.height < 5) {
+                    alert('框选区域过小，请重试');
+                    return;
+                }
+                const W = mainCanvas.width;
+                const H = mainCanvas.height;
+                norm.x = Math.max(0, Math.min(norm.x, W - 1));
+                norm.y = Math.max(0, Math.min(norm.y, H - 1));
+                norm.width = Math.min(norm.width, W - norm.x);
+                norm.height = Math.min(norm.height, H - norm.y);
+                if (norm.width < 2 || norm.height < 2) return;
+                const tile = document.createElement('canvas');
+                tile.width = Math.round(norm.width);
+                tile.height = Math.round(norm.height);
+                const tctx = tile.getContext('2d');
+                tctx.drawImage(mainCanvas, norm.x, norm.y, norm.width, norm.height, 0, 0, tile.width, tile.height);
+                const dataUrl = tile.toDataURL('image/png');
+                try {
+                    sessionStorage.setItem('SDOC_SCREENSHOT_CHAR_RESULT', JSON.stringify({ dataUrl, ts: Date.now() }));
+                } catch (err) {
+                    alert('无法保存截图（存储空间不足），请缩小选区重试');
+                    return;
+                }
+                location.href = 'createChar.html';
+                return;
+            }
             if (!isDrawing) return;
             isDrawing = false;
 
@@ -2012,6 +2266,14 @@
 
         function renderInteractionLayer() {
             interactionCtx.clearRect(0, 0, interactionCanvas.width, interactionCanvas.height);
+
+            if (screenshotCharMode && screenshotRectDraw && (screenshotRectDraw.width || screenshotRectDraw.height)) {
+                interactionCtx.strokeStyle = '#1a6B5C';
+                interactionCtx.lineWidth = 2;
+                interactionCtx.setLineDash([6, 4]);
+                interactionCtx.strokeRect(screenshotRectDraw.x, screenshotRectDraw.y, screenshotRectDraw.width, screenshotRectDraw.height);
+                interactionCtx.setLineDash([]);
+            }
 
             if (currentTool === 'slash' && currentSlashPreview) {
                 interactionCtx.strokeStyle = '#E0E0E0';
@@ -2284,6 +2546,7 @@
         }
 
         function deleteAnnotation(id) {
+            if (isViewerRole()) return;
             saveUndoState();
             cleanupRelationsBeforeDelete([id]);
             AppState.annotations = AppState.annotations.filter(a => a.id !== id);
@@ -2406,6 +2669,7 @@
         }
 
         function updateAnnotationSimplified(value) {
+            if (isViewerRole()) return;
             if (selectedAnnotation) {
                 selectedAnnotation.simplifiedChar = value;
                 updateAnnotationList();
@@ -2415,6 +2679,7 @@
         }
 
         function updateAnnotationNote(value) {
+            if (isViewerRole()) return;
             if (selectedAnnotation) {
                 selectedAnnotation.note = value;
                 collabEmitAnnotationUpdate(selectedAnnotation);
@@ -2436,6 +2701,7 @@
                 return;
             }
 
+            const showAnnDelete = !isViewerRole();
             container.innerHTML = pageAnnotations.map(ann => {
                 const typeName = ann.type === 'slash' ? '斜线' : getMarkTypeName(ann.type);
                 const attrInfo = ann.attrType ? ` <span style="color:${ann.color};">(${ann.attrType})</span>` : '';
@@ -2452,6 +2718,11 @@
                 else {
                     displayChar = ann.simplifiedChar || (ann.type === 'slash' ? '/' : '?');
                 }
+                const deleteBtnHtml = showAnnDelete
+                    ? `<button class="annotation-action-btn delete" onclick="event.stopPropagation(); deleteAnnotation('${ann.id}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>`
+                    : '';
                 return `
                     <div class="annotation-card ${selectedAnnotation?.id === ann.id ? 'selected' : ''}" onclick="selectAnnotationById('${ann.id}')">
                         <div class="annotation-preview">
@@ -2465,9 +2736,7 @@
                             <button class="annotation-action-btn" onclick="event.stopPropagation(); selectAnnotationById('${ann.id}')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                             </button>
-                            <button class="annotation-action-btn delete" onclick="event.stopPropagation(); deleteAnnotation('${ann.id}')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                            </button>
+                            ${deleteBtnHtml}
                         </div>
                     </div>
                 `;
@@ -2752,18 +3021,20 @@
                 return;
             }
 
+            const showThumbDelete = !isViewerRole();
             container.innerHTML = AppState.pages.map((page, index) => `
                 <div class="thumbnail-item ${index === AppState.currentPageIndex ? 'active' : ''}" onclick="loadPage(${index})">
                     <img src="${page.imageSrc}" alt="Page ${index + 1}">
                     <span class="thumbnail-page">${index + 1}</span>
-                    <button class="thumbnail-delete" onclick="event.stopPropagation(); deletePage(${index})">
+                    ${showThumbDelete ? `<button class="thumbnail-delete" onclick="event.stopPropagation(); deletePage(${index})">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </button>
+                    </button>` : ''}
                 </div>
             `).join('');
         }
 
         function deletePage(index, options = {}) {
+            if (isViewerRole()) return;
             if (!Number.isInteger(index) || index < 0 || index >= AppState.pages.length) return;
             const emitCollab = options.emitCollab !== false;
             const markModifiedFlag = options.markModified !== false;
@@ -2922,6 +3193,29 @@
             event.target.value = '';
         }
 
+        async function postProjectSnapshotToServer() {
+            const snapshotPayload = {
+                project: AppState.project,
+                pages: AppState.pages,
+                annotations: AppState.annotations,
+                customChars: AppState.customChars,
+                exportedAt: new Date().toISOString()
+            };
+            const headers = Object.assign(
+                { 'Content-Type': 'application/json' },
+                window.Auth && window.Auth.getAuthHeaders ? window.Auth.getAuthHeaders() : {}
+            );
+            const resp = await fetch(`${API_BASE}/api/projects`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(snapshotPayload)
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || '保存失败');
+            }
+        }
+
         async function saveProject() {
             // 1. 检查 AppState 数据是否完整
             if (!isProjectInfoComplete()) {
@@ -2934,20 +3228,12 @@
             AppState.save();
 
             // 3. 同步到数据库（保存“项目快照”）
+            if (currentProjectUserRole === 'viewer') {
+                alert('您是只读成员，无法保存到服务器');
+                return;
+            }
             try {
-                const snapshotPayload = {
-                    project: AppState.project,
-                    pages: AppState.pages,
-                    annotations: AppState.annotations,
-                    customChars: AppState.customChars,
-                    exportedAt: new Date().toISOString()
-                };
-
-                await fetch(`${API_BASE}/api/projects`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(snapshotPayload)
-                });
+                await postProjectSnapshotToServer();
                 setStatus('项目已保存到数据库', 'saved');
             } catch (e) {
                 console.warn('saveProject db sync failed:', e);
@@ -2956,6 +3242,37 @@
 
             // 4. 同步保留原有：导出 .sdocproj（作为本地备份/离线迁移）
             ProjectManager.export();
+        }
+
+        async function exitCurrentProjectEditing() {
+            if (!confirm('确定退出当前项目编辑？将先保存本地；若有完整项目信息且为编辑权限，将尝试同步到服务器。')) return;
+
+            AppState.save();
+
+            const canServer = (currentProjectUserRole === 'admin' || currentProjectUserRole === 'editor')
+                && window.Auth && window.Auth.isLoggedIn && window.Auth.isLoggedIn()
+                && isProjectInfoComplete();
+
+            if (canServer) {
+                try {
+                    await postProjectSnapshotToServer();
+                } catch (e) {
+                    console.warn('exitCurrentProjectEditing: server sync failed', e);
+                }
+            }
+
+            forceLeaveCollabMode();
+            undoStack = [];
+            redoStack = [];
+            selectedAnnotation = null;
+            currentProjectUserRole = 'editor';
+            AppState.clear();
+            clearCanvases();
+            clearPropertyPanel();
+            setStatus('', 'saved');
+            updateUI();
+            applyReadOnlyProjectUi();
+            await refreshProjectRole();
         }
 
         function handleExportXML() {
@@ -2980,6 +3297,7 @@
         }
 
         function undoAction() {
+            if (isViewerRole()) return;
             if (undoStack.length === 0) return;
             redoStack.push(JSON.stringify(AppState.annotations));
             AppState.annotations = JSON.parse(undoStack.pop());
@@ -2992,6 +3310,7 @@
         }
 
         function redoAction() {
+            if (isViewerRole()) return;
             if (redoStack.length === 0) return;
             undoStack.push(JSON.stringify(AppState.annotations));
             AppState.annotations = JSON.parse(redoStack.pop());
@@ -3034,21 +3353,23 @@
                 return;
             }
 
+            const showCharDelete = !isViewerRole();
             container.innerHTML = AppState.customChars.map(char => `
                 <div class="custom-char-item" title="${char.name}">
                     <img src="${char.imageData}" alt="${char.name}" onclick="useCustomChar('${char.id}')">
-                    <button class="custom-char-delete" onclick="event.stopPropagation(); deleteCustomChar('${char.id}')">
+                    ${showCharDelete ? `<button class="custom-char-delete" onclick="event.stopPropagation(); deleteCustomChar('${char.id}')">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
-                    </button>
+                    </button>` : ''}
                 </div>
             `).join('');
 
         }
 
         function deleteCustomChar(charId) {
+            if (isViewerRole()) return;
             // 从全局状态中移除指定造字
             AppState.customChars = AppState.customChars.filter(c => c.id !== charId);
             AppState.save();                // 保存到 localStorage
@@ -3057,6 +3378,7 @@
         }
 
         function useCustomChar(charId) {
+            if (isViewerRole()) return;
             const char = AppState.customChars.find(c => c.id === charId);
             if (char && selectedAnnotation) {
                 selectedAnnotation.simplifiedChar = char.name;
@@ -3096,9 +3418,12 @@
         }
 
         // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', () => {
+            initScreenshotCharUi();
+            init();
+            refreshProjectRole();
+        });
 
-        <!--附加内容-->
         function checkProjectInfoComplete() {
             if (!AppState.project ||
                 !AppState.project.title ||
