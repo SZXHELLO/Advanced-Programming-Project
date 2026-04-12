@@ -460,7 +460,7 @@ const XMLGenerator = {
                     .filter(Boolean);
                 xml += this.renderTextfield(sentence, 10, children);
             });
-            xml += `        <sentence>\n`;
+            xml += `        </sentence>\n`;
             xml += `      </panel>\n`;
             xml += `    </page>\n`;
         });
