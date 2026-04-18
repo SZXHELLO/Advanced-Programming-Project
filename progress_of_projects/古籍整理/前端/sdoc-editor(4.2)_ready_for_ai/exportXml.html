@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XML导出 | SDOC Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        .export-page {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: var(--space-md);
+            overflow: hidden;
+        }
+
+        .page-header {
+            margin-bottom: var(--space-md);
+            flex-shrink: 0;
+        }
+
+        .page-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-xs);
+        }
+
+        .page-desc {
+            color: var(--color-text-light);
+            font-size: 13px;
+        }
+
+        .export-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: var(--space-md);
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .settings-panel {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+            overflow-y: auto;
+        }
+
+        .settings-card {
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-md);
+        }
+
+        .section-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .section-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--color-cinnabar);
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-xs);
+            background: var(--color-paper);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+
+        .checkbox-item input {
+            width: 16px;
+            height: 16px;
+        }
+
+        .checkbox-item label {
+            flex: 1;
+        }
+
+        .export-summary {
+            background: var(--color-paper);
+            border-radius: var(--radius-md);
+            padding: var(--space-sm);
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--space-xs) 0;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 12px;
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-label {
+            color: var(--color-text-light);
+        }
+
+        .summary-value {
+            font-weight: 600;
+            color: var(--color-ink);
+        }
+
+        .project-info {
+            background: var(--color-paper);
+            border-radius: var(--radius-md);
+            padding: var(--space-sm);
+        }
+
+        .project-info-item {
+            display: flex;
+            padding: var(--space-xs) 0;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 12px;
+        }
+
+        .project-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .project-info-label {
+            width: 50px;
+            color: var(--color-text-light);
+        }
+
+        .project-info-value {
+            flex: 1;
+            color: var(--color-ink);
+        }
+
+        /* 右侧预览区域 */
+        .preview-panel {
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .preview-header {
+            padding: var(--space-sm) var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .preview-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-ink);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .preview-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--color-cinnabar);
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .preview-actions .btn {
+            padding: var(--space-xs) var(--space-sm);
+            font-size: 12px;
+        }
+
+        .preview-content {
+            flex: 1;
+            overflow: auto;
+            padding: var(--space-md);
+            background: #1e1e1e;
+        }
+
+        .xml-preview {
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #d4d4d4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+
+        /* 空状态提示 */
+        .empty-warning {
+            background: #FFF3E0;
+            border: 1px solid #FFB74D;
+            border-radius: var(--radius-md);
+            padding: var(--space-sm);
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .empty-warning svg {
+            width: 20px;
+            height: 20px;
+            color: #F57C00;
+            flex-shrink: 0;
+        }
+
+        .empty-warning-text {
+            flex: 1;
+        }
+
+        .empty-warning-title {
+            font-weight: 600;
+            color: #E65100;
+            font-size: 12px;
+        }
+
+        .empty-warning-desc {
+            font-size: 11px;
+            color: #BF360C;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            gap: var(--space-sm);
+            margin-top: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .nav-buttons .btn {
+            flex: 1;
+            padding: var(--space-sm);
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <header class="top-nav">
+        <a href="index.html" class="nav-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            <span>古籍编辑器</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                首页
+            </a>
+            <a href="edit.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                编辑
+            </a>
+            <a href="createChar.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path></svg>
+                造字
+            </a>
+            <a href="exportXml.html" class="nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                导出
+            </a>
+            <a href="upload.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                上传
+            </a>
+        </div>
+        <div class="nav-spacer"></div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="page-container">
+        <div class="export-page">
+            <!-- 页面标题 -->
+            <div class="page-header">
+                <h1 class="page-title">XML 导出</h1>
+                <p class="page-desc">按照 SDOC 标准格式导出古籍整理结果</p>
+            </div>
+
+            <!-- 空状态提示 -->
+            <div class="empty-warning" id="emptyWarning" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <div class="empty-warning-text">
+                    <div class="empty-warning-title">暂无可导出的数据</div>
+                    <div class="empty-warning-desc">请先上传古籍图片并进行编辑标注</div>
+                </div>
+                <a href="upload.html" class="btn btn-primary" style="padding: var(--space-xs) var(--space-sm); font-size: 12px;">去上传</a>
+            </div>
+
+            <!-- 导出布局 -->
+            <div class="export-layout">
+                <!-- 左侧设置面板 -->
+                <div class="settings-panel">
+                    <!-- 项目信息 -->
+                    <div class="settings-card">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            项目信息
+                        </div>
+                        <div class="project-info">
+                            <div class="project-info-item">
+                                <span class="project-info-label">标题</span>
+                                <span class="project-info-value" id="projectTitle">未命名</span>
+                            </div>
+                            <div class="project-info-item">
+                                <span class="project-info-label">作者</span>
+                                <span class="project-info-value" id="projectAuthor">-</span>
+                            </div>
+                            <div class="project-info-item">
+                                <span class="project-info-label">朝代</span>
+                                <span class="project-info-value" id="projectDynasty">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 导出选项 -->
+                    <div class="settings-card">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                            导出选项
+                        </div>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="optPages" checked disabled>
+                                <label for="optPages">包含页面结构</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="optView" checked disabled>
+                                <label for="optView">包含视图信息</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="optAnnotations" checked disabled>
+                                <label for="optAnnotations">包含标注数据</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 导出摘要 -->
+                    <div class="settings-card">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line></svg>
+                            导出摘要
+                        </div>
+                        <div class="export-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">页面数</span>
+                                <span class="summary-value" id="summaryPages">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">标注数</span>
+                                <span class="summary-value" id="summaryAnnotations">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">XML大小</span>
+                                <span class="summary-value" id="summarySize">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 导出按钮 -->
+                    <button class="btn btn-primary" style="width: 100%;" onclick="downloadXML()" id="exportBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        下载 XML 文件
+                    </button>
+                </div>
+
+                <!-- 右侧预览区域 -->
+                <div class="preview-panel">
+                    <div class="preview-header">
+                        <div class="preview-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            XML 预览
+                        </div>
+                        <div class="preview-actions">
+                            <button class="btn btn-outline" onclick="refreshPreview()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                                刷新
+                            </button>
+                            <button class="btn btn-outline" onclick="copyXML()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                复制
+                            </button>
+                        </div>
+                    </div>
+                    <div class="preview-content">
+                        <pre class="xml-preview" id="xmlPreview">/* 加载中... */</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导航按钮 -->
+            <div class="nav-buttons">
+                <a href="index.html" class="btn btn-outline">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                    返回首页
+                </a>
+                <a href="edit.html" class="btn btn-outline">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    继续编辑
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部状态栏 -->
+    <footer class="statusbar">
+        <div class="status-item">
+            <span class="status-dot"></span>
+            <span>导出页面</span>
+        </div>
+        <div class="status-item">
+            <span>格式: SDOC XML v1.0</span>
+        </div>
+    </footer>
+
+    <script src="js/common.js"></script>
+    <script>
+        let currentXML = '';
+
+        function init() {
+            updateUI();
+        }
+
+        function updateUI() {
+            const hasData = AppState.pages.length > 0;
+
+            document.getElementById('emptyWarning').style.display = hasData ? 'none' : 'flex';
+
+            const project = AppState.project || {};
+            document.getElementById('projectTitle').textContent = project.title || '未命名';
+            document.getElementById('projectAuthor').textContent = project.author || '-';
+            document.getElementById('projectDynasty').textContent = project.dynasty || '-';
+
+            document.getElementById('summaryPages').textContent = AppState.pages.length;
+            document.getElementById('summaryAnnotations').textContent = AppState.annotations.length;
+
+            generateXML();
+        }
+
+        function generateXML() {
+            if (AppState.pages.length === 0 && !AppState.project) {
+                currentXML = '<?xml version="1.0" encoding="UTF-8"?>\n<!-- 暂无数据可导出 -->';
+                document.getElementById('xmlPreview').textContent = currentXML;
+                document.getElementById('summarySize').textContent = '-';
+                return;
+            }
+
+            currentXML = XMLGenerator.generate();
+            document.getElementById('xmlPreview').textContent = currentXML;
+
+            const size = new Blob([currentXML]).size;
+            document.getElementById('summarySize').textContent = formatSize(size);
+        }
+
+        function refreshPreview() {
+            AppState.load();
+            updateUI();
+        }
+
+        function copyXML() {
+            navigator.clipboard.writeText(currentXML).then(() => {
+                alert('XML已复制到剪贴板');
+            }).catch(() => {
+                alert('复制失败，请手动选择复制');
+            });
+        }
+
+        function downloadXML() {
+            if (!currentXML || AppState.pages.length === 0) {
+                alert('暂无数据可导出');
+                return;
+            }
+
+            const filename = `${AppState.project?.title || '古籍'}_${new Date().toISOString().split('T')[0]}.xml`;
+            downloadFile(currentXML, filename, 'application/xml');
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.inland-security-footer {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  right: 0;
+  width: fit-content;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tooltip-container {
+  position: relative;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.minimax-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 300;
+  color: #adadad;
+  text-decoration: none;
+}
+
+.minimax-link:visited {
+  color: #adadad;
+}
+
+.minimax-link:hover {
+  color: #666666;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: 16px; /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+  font-size: 12px;
+  line-height: 17px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #171717;
+}
+
+/* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+.tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: flex;
+}
+
+.info-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.beian-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #171717;
+}
+
+.beian-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.underline-text {
+  color: #171717;
+  text-decoration: underline;
+}
+
+.underline-text:hover {
+  color: #000000;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .trigger-content {
+    background-color: transparent;
+  }
+
+  .minimax-link,
+  .minimax-link:visited {
+    color: #666666;
+  }
+
+  .minimax-link:hover {
+    color: #adadad;
+  }
+
+  .tooltip-content {
+    background-color: #262626;
+    color: #ededed;
+  }
+
+  .beian-link,
+  .underline-text {
+    color: #ededed;
+  }
+
+  .underline-text:hover {
+    color: #ffffff;
+  }
+}
+
+</style>
+<div class="inland-security-footer">
+  <div class="tooltip-container">
+    <div class="trigger-content">
+      <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+        <span>© 2026 MiniMax</span>
+      </a>
+    </div>
+    <div class="tooltip-content">
+      <section class="info-section">
+        <span>上海稀宇科技有限公司</span>
+      </section>
+
+      <section class="info-section">
+        <a class="beian-link" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179" target="_blank" rel="noreferrer">
+          <img alt="hailuo-beian-icon" src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png" class="beian-icon">
+          <span class="underline-text">沪公网安备31010402010179号</span>
+        </a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+          沪ICP备2023003282号-38
+        </a>
+      </section>
+
+      <section class="info-section">
+        <span>模型名称：MiniMax</span>
+        <span>备案号：Shanghai-MiniMax-202505230046</span>
+      </section>
+
+      <section class="info-section">
+        <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer" class="underline-text">
+          用户协议
+        </a>
+        <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer" class="underline-text">
+          隐私政策
+        </a>
+      </section>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

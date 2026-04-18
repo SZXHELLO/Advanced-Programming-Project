@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>项目成员 | SDOC Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/surface-pages.css">
+  <link rel="stylesheet" href="css/project-members.css">
+</head>
+
+<body>
+  <header class="top-nav">
+    <a href="index.html" class="nav-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span>古籍编辑器</span>
+    </a>
+    <nav class="nav-links nav-breadcrumb" aria-label="面包屑">
+      <a href="index.html" class="nav-link">首页</a>
+      <span class="nav-breadcrumb-sep" aria-hidden="true">&gt;</span>
+      <a href="project.html" class="nav-link">项目</a>
+      <span class="nav-breadcrumb-sep" aria-hidden="true">&gt;</span>
+      <span class="nav-breadcrumb-current">成员管理</span>
+    </nav>
+    <div class="nav-spacer"></div>
+  </header>
+
+  <main class="page-container surface-scroll">
+    <div class="surface-page-wrap">
+      <div class="surface-inner">
+        <div class="surface-page-header">
+          <h1 class="surface-page-title">项目成员管理</h1>
+          <p class="surface-page-desc">管理成员、邀请链接与加入申请</p>
+        </div>
+
+        <div class="tabs surface-tabs">
+          <button type="button" class="tab-btn surface-tab-btn active" data-tab="members">成员</button>
+          <button type="button" class="tab-btn surface-tab-btn" data-tab="invite">邀请</button>
+          <button type="button" class="tab-btn surface-tab-btn" data-tab="links">邀请链接</button>
+          <button type="button" class="tab-btn surface-tab-btn" data-tab="requests">加入申请 <span id="req-badge"
+              class="badge" style="display:none;">0</span></button>
+          <button type="button" class="tab-btn surface-tab-btn" data-tab="activity">活动日志</button>
+          <button type="button" class="tab-btn surface-tab-btn" data-tab="settings">设置</button>
+        </div>
+
+        <div id="panel-members" class="tab-panel surface-tab-panel active">
+          <div class="surface-table-wrap">
+            <table class="data-table surface-data-table" id="members-table">
+              <thead>
+                <tr>
+                  <th>用户</th>
+                  <th>角色</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="panel-invite" class="tab-panel surface-tab-panel">
+          <div class="surface-card">
+            <div class="surface-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7" r="4"></circle>
+                <line x1="20" y1="8" x2="20" y2="14"></line>
+                <line x1="23" y1="11" x2="17" y2="11"></line>
+              </svg>
+              用户名邀请（7 天有效）
+            </div>
+            <div class="surface-form-row">
+              <input type="text" class="surface-input" id="invite-username" placeholder="用户名" style="max-width:220px;">
+              <select id="invite-role" class="surface-select" style="max-width:140px;">
+                <option value="editor">可编辑</option>
+                <option value="viewer">只读</option>
+              </select>
+              <button type="button" class="btn btn-primary" id="btn-invite">发送邀请</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-links" class="tab-panel surface-tab-panel">
+          <div class="surface-card">
+            <div class="surface-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              新建链接
+            </div>
+            <!-- <div class="surface-form-row">
+              <select id="link-role" class="surface-select" style="max-width:140px;">
+                <option value="editor">可编辑</option>
+                <option value="viewer">只读</option>
+              </select>
+              <label class="surface-muted" style="display:flex;align-items:center;gap:6px;">有效次数<input type="number"
+                  class="surface-input" id="link-max-uses" value="10" min="1" style="width:80px;"></label>
+              <label class="surface-muted" style="display:flex;align-items:center;gap:6px;"><input type="checkbox"
+                  id="link-unlimited"> 无限制次数</label>
+              <label class="surface-muted">有效天数 <input type="number" class="surface-input" id="link-expires-days"
+                  value="7" min="1" max="30" style="width:60px;display:inline-block;"></label>
+              <button type="button" class="btn btn-primary" id="btn-create-link">生成</button>
+            </div> -->
+
+            <div class="link-form-container">
+              <!-- 第一行：角色选择 -->
+              <div class="form-field">
+                <label class="form-label">角色权限</label>
+                <select id="link-role" class="surface-select">
+                  <option value="editor">可编辑</option>
+                  <option value="viewer">只读</option>
+                </select>
+              </div>
+
+              <!-- 第二行：使用次数 -->
+              <div class="form-field">
+                <label class="form-label">使用次数</label>
+                <div class="input-group">
+                  <input type="number" class="surface-input" id="link-max-uses" value="10" min="1" max="9999"
+                    placeholder="10">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="link-unlimited">
+                    <span>无限制</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 第三行：有效期 -->
+              <div class="form-field">
+                <label class="form-label">有效期限</label>
+                <div class="input-with-unit">
+                  <input type="number" class="surface-input" id="link-expires-days" value="7" min="1" max="30">
+                  <span class="input-unit">天</span>
+                </div>
+              </div>
+
+              <!-- 生成按钮 -->
+              <div class="form-field form-actions">
+                <button type="button" class="btn btn-primary btn-block" id="btn-create-link">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    style="width:16px;height:16px;margin-right:6px;">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                  </svg>
+                  生成邀请链接
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="surface-section-title" style="margin-top:var(--space-md);">已创建的链接</div>
+          <div class="surface-table-wrap">
+            <table class="data-table surface-data-table" id="links-table">
+              <thead>
+                <tr>
+                  <th>链接</th>
+                  <th>角色</th>
+                  <th>使用</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="panel-requests" class="tab-panel surface-tab-panel">
+          <div class="surface-form-row" style="margin-bottom:var(--space-md);">
+            <select id="request-status-filter" class="surface-select" style="max-width:200px;">
+              <option value="pending">待审批</option>
+              <option value="approved">已批准</option>
+              <option value="rejected">已拒绝</option>
+              <option value="all">全部</option>
+            </select>
+          </div>
+          <div id="join-requests-list"></div>
+        </div>
+
+        <div id="panel-activity" class="tab-panel surface-tab-panel">
+          <div class="surface-card">
+            <button type="button" class="btn btn-outline" id="btn-export-csv">导出 CSV（管理员）</button>
+            <div id="activity-timeline" class="activity-timeline-scroll"></div>
+            <div class="surface-form-row" style="margin-top:var(--space-md);">
+              <button type="button" class="btn btn-outline" id="prev-page">上一页</button>
+              <span id="page-info" class="surface-muted"></span>
+              <button type="button" class="btn btn-outline" id="next-page">下一页</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-settings" class="tab-panel surface-tab-panel">
+          <div class="surface-card">
+            <label class="surface-muted"
+              style="display:flex;align-items:center;gap:8px;margin-bottom:var(--space-sm);"><input type="checkbox"
+                id="set-public"> 公开项目（出现在公开列表）</label>
+            <label class="surface-muted"
+              style="display:flex;align-items:center;gap:8px;margin-bottom:var(--space-md);"><input type="checkbox"
+                id="set-join-req"> 允许申请加入</label>
+            <button type="button" class="btn btn-primary" id="btn-save-settings">保存设置</button>
+            <p style="margin-top:var(--space-md);"><a id="join-request-link" href="#" class="surface-link">申请加入页面链接</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="statusbar">
+    <div class="status-item"><span>项目成员</span></div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    const API_BASE = window.SDOC_API_BASE || 'http://localhost:8000';
+    const projectId = new URLSearchParams(location.search).get('id') || '';
+    let myRole = '';
+    let actPage = 1;
+
+    function hdr() {
+      return Object.assign({ 'Content-Type': 'application/json' }, Auth.getAuthHeaders());
+    }
+
+    async function loadMembers() {
+      const resp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/members', { headers: Auth.getAuthHeaders() });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const tbody = document.querySelector('#members-table tbody');
+      tbody.innerHTML = (data.members || []).map(m => `
+        <tr>
+          <td>${m.username}</td>
+          <td>${m.role}</td>
+          <td>
+            ${myRole === 'admin' ? '<select data-uid="' + m.userId + '" class="role-sel surface-select" style="max-width:120px;display:inline-block;"><option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>admin</option><option value="editor"' + (m.role === 'editor' ? ' selected' : '') + '>editor</option><option value="viewer"' + (m.role === 'viewer' ? ' selected' : '') + '>viewer</option></select> <button type="button" class="surface-btn-sm danger" data-remove="' + m.userId + '">移除</button>' : ''}
+          </td>
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('.role-sel').forEach(sel => {
+        sel.addEventListener('change', async () => {
+          const uid = sel.getAttribute('data-uid');
+          await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/members/' + uid, {
+            method: 'PATCH',
+            headers: hdr(),
+            body: JSON.stringify({ role: sel.value })
+          });
+          loadMembers();
+        });
+      });
+      tbody.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('确定移除？')) return;
+          const uid = btn.getAttribute('data-remove');
+          await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/members/' + uid, {
+            method: 'DELETE',
+            headers: Auth.getAuthHeaders()
+          });
+          loadMembers();
+        });
+      });
+    }
+
+    function isPendingInvitationLink(l) {
+      if (!l) return false;
+      const st = l.status;
+      if (st && st !== 'pending') return false;
+      if (l.expiresAt && new Date(l.expiresAt) < new Date()) return false;
+      return true;
+    }
+
+    async function loadLinks() {
+      const listUrl = API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/invitation-links';
+      const resp = await fetch(listUrl, {
+        headers: Auth.getAuthHeaders(),
+        cache: 'no-store'
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const links = (data.links || []).filter(isPendingInvitationLink);
+      const tbody = document.querySelector('#links-table tbody');
+      if (links.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="surface-muted" style="text-align:center;padding:16px;">暂无有效邀请链接</td></tr>';
+        return;
+      }
+      tbody.innerHTML = links.map(l => `
+        <tr>
+          <td style="max-width:240px;word-break:break-all;">${l.url || ''}</td>
+          <td>${l.role}</td>
+          <td>${l.usedCount}/${l.maxUses === -1 ? '∞' : l.maxUses}</td>
+          <td><button type="button" class="surface-btn-sm danger" data-revoke="${String(l.id)}">撤销</button></td>
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('[data-revoke]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const rid = btn.getAttribute('data-revoke');
+          const row = btn.closest('tr');
+          const delResp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/invitation-links/' + encodeURIComponent(rid), {
+            method: 'DELETE',
+            headers: Auth.getAuthHeaders(),
+            cache: 'no-store'
+          });
+          if (!delResp.ok) {
+            const err = await delResp.json().catch(() => ({}));
+            alert(err.error || '撤销失败');
+            return;
+          }
+          if (row) row.remove();
+          await loadLinks();
+        });
+      });
+    }
+
+    async function loadRequests() {
+      const st = document.getElementById('request-status-filter').value;
+      const resp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/join-requests?status=' + encodeURIComponent(st), { headers: Auth.getAuthHeaders() });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const box = document.getElementById('join-requests-list');
+      box.innerHTML = (data.requests || []).map(r => `
+        <div class="request-card surface-card" style="margin-bottom:var(--space-sm);">
+          <strong>${r.username}</strong> — ${r.status} — ${r.requestedRole}
+          <p>${(r.message || '').replace(/</g, '')}</p>
+          ${r.status === 'pending' ? '<select id="grant-' + r.id + '" class="surface-select" style="max-width:120px;display:inline-block;"><option value="viewer">viewer</option><option value="editor">editor</option></select> <button type="button" class="btn btn-primary" data-app="' + r.id + '">批准</button> <button type="button" class="btn btn-outline" data-rej="' + r.id + '">拒绝</button>' : ''}
+        </div>
+      `).join('');
+      box.querySelectorAll('[data-app]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-app');
+          const grantedRole = document.getElementById('grant-' + id).value;
+          await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/join-requests/' + id + '/review', {
+            method: 'POST',
+            headers: hdr(),
+            body: JSON.stringify({ action: 'approve', grantedRole, message: '' })
+          });
+          loadRequests();
+          loadMembers();
+        });
+      });
+      box.querySelectorAll('[data-rej]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-rej');
+          await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/join-requests/' + id + '/review', {
+            method: 'POST',
+            headers: hdr(),
+            body: JSON.stringify({ action: 'reject', message: '拒绝' })
+          });
+          loadRequests();
+        });
+      });
+    }
+
+    async function loadActivity(page) {
+      actPage = page || 1;
+      const resp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/activity-logs?page=' + actPage + '&limit=20', { headers: Auth.getAuthHeaders() });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      document.getElementById('activity-timeline').innerHTML = (data.logs || []).map(l => `
+        <div class="timeline-item"><small>${l.createdAt}</small> — ${l.actionType} — ${l.user ? l.user.username : '系统'}</div>
+      `).join('');
+      const p = data.pagination || {};
+      document.getElementById('page-info').textContent = '第 ' + (p.currentPage || 1) + ' / ' + (p.totalPages || 1) + ' 页';
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.getAttribute('data-tab')).classList.add('active');
+      });
+    });
+
+    document.getElementById('btn-invite').addEventListener('click', async () => {
+      const username = document.getElementById('invite-username').value.trim();
+      const role = document.getElementById('invite-role').value;
+      await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/invitations', {
+        method: 'POST',
+        headers: hdr(),
+        body: JSON.stringify({ username, role })
+      });
+      alert('已发送');
+    });
+
+    document.getElementById('btn-create-link').addEventListener('click', async () => {
+      const role = document.getElementById('link-role').value;
+      const unlimited = document.getElementById('link-unlimited').checked;
+      const maxUses = unlimited ? -1 : parseInt(document.getElementById('link-max-uses').value, 10);
+      const expiresInDays = parseInt(document.getElementById('link-expires-days').value, 10);
+      const resp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/invitation-links', {
+        method: 'POST',
+        headers: hdr(),
+        body: JSON.stringify({ role, maxUses, expiresInDays })
+      });
+      const data = await resp.json();
+      if (resp.ok) alert('链接：' + (data.invitationUrl || ''));
+      loadLinks();
+    });
+
+    document.getElementById('request-status-filter').addEventListener('change', loadRequests);
+    document.getElementById('prev-page').addEventListener('click', () => loadActivity(actPage - 1));
+    document.getElementById('next-page').addEventListener('click', () => loadActivity(actPage + 1));
+
+    document.getElementById('btn-export-csv').addEventListener('click', () => {
+      const token = Auth.getSession()?.sessionId || '';
+      window.location.href = API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/activity-logs/export?sessionId=' + encodeURIComponent(token);
+    });
+
+    document.getElementById('btn-save-settings').addEventListener('click', async () => {
+      const resp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/settings', {
+        method: 'PATCH',
+        headers: hdr(),
+        body: JSON.stringify({
+          isPublic: document.getElementById('set-public').checked,
+          allowJoinRequests: document.getElementById('set-join-req').checked
+        })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        alert(data.error || ('保存失败（' + resp.status + '）'));
+        return;
+      }
+      alert('已保存');
+    });
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.isLoggedIn()) { location.href = 'login.html'; return; }
+      if (!projectId) { alert('缺少项目'); return; }
+      const lr = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/latest', { headers: Auth.getAuthHeaders() });
+      if (!lr.ok) { alert('无权访问'); return; }
+      const meta = await lr.json();
+      myRole = meta.userRole || '';
+      const pubEl = document.getElementById('set-public');
+      const joinEl = document.getElementById('set-join-req');
+      if (pubEl) pubEl.checked = !!meta.isPublic;
+      if (joinEl) joinEl.checked = !!meta.allowJoinRequests;
+      if (myRole !== 'admin') {
+        document.querySelectorAll('[data-tab="invite"],[data-tab="links"],[data-tab="requests"],[data-tab="settings"]').forEach(el => el.style.display = 'none');
+      }
+      document.getElementById('join-request-link').href = 'project-join-request.html?id=' + encodeURIComponent(projectId);
+      loadMembers();
+      loadLinks();
+      loadRequests();
+      loadActivity(1);
+      const pending = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(projectId) + '/join-requests?status=pending', { headers: Auth.getAuthHeaders() });
+      const pj = await pending.json();
+      const n = (pj.requests || []).length;
+      if (n > 0) {
+        const b = document.getElementById('req-badge');
+        b.textContent = String(n);
+        b.style.display = 'inline-block';
+      }
+    });
+
+    document.getElementById('link-unlimited').addEventListener('change', function () {
+      const maxUsesInput = document.getElementById('link-max-uses');
+      if (this.checked) {
+        maxUsesInput.disabled = true;
+        maxUsesInput.style.opacity = '0.5';
+        maxUsesInput.value = '∞';
+      } else {
+        maxUsesInput.disabled = false;
+        maxUsesInput.style.opacity = '1';
+        maxUsesInput.value = '10';
+      }
+    });
+  </script>
+</body>
+
+</html>

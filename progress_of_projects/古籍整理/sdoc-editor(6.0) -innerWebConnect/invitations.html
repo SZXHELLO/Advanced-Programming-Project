@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的邀请 | SDOC Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/surface-pages.css">
+</head>
+
+<body>
+  <header class="top-nav">
+    <a href="index.html" class="nav-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span>古籍编辑器</span>
+    </a>
+    <div class="nav-links">
+      <a href="project.html" class="nav-link">项目</a>
+    </div>
+    <div class="nav-spacer"></div>
+  </header>
+
+  <main class="page-container surface-scroll">
+    <div class="surface-page-wrap">
+      <div class="surface-inner surface-inner--narrow">
+        <div class="surface-page-header">
+          <h1 class="surface-page-title">待处理邀请</h1>
+          <p class="surface-page-desc">接受或拒绝他人向您发出的项目邀请</p>
+        </div>
+        <div id="list"></div>
+        <p id="empty" class="surface-card surface-muted" style="display:none;text-align:center;padding:var(--space-xl);">暂无邀请</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="statusbar">
+    <div class="status-item"><span>我的邀请</span></div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    const API_BASE = window.SDOC_API_BASE || 'http://localhost:8000';
+    async function loadInvitations() {
+      if (!Auth.isLoggedIn()) { location.href = 'login.html'; return; }
+      const resp = await fetch(API_BASE + '/api/invitations', { headers: Auth.getAuthHeaders() });
+      if (!resp.ok) { alert('加载失败'); return; }
+      const data = await resp.json();
+      const inv = data.invitations || [];
+      const el = document.getElementById('list');
+      document.getElementById('empty').style.display = inv.length ? 'none' : 'block';
+      el.innerHTML = inv.map(i => `
+        <div class="surface-card" style="margin-bottom:var(--space-md);">
+          <div class="surface-section-title" style="margin-bottom:var(--space-sm);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            ${i.projectName || ''}
+          </div>
+          <p class="surface-muted" style="margin-bottom:6px;">邀请人：${i.inviterName || ''}</p>
+          <p class="surface-muted" style="margin-bottom:6px;">角色：${i.role === 'editor' ? '可编辑' : '只读'}</p>
+          <p class="surface-muted" style="margin-bottom:var(--space-md);">过期：${i.expiresAt ? new Date(i.expiresAt).toLocaleString() : '-'}</p>
+          <div class="surface-toolbar" style="margin-bottom:0;">
+            <button type="button" class="btn btn-primary" onclick="respond(${i.id},'accept')">接受</button>
+            <button type="button" class="btn btn-outline" onclick="respond(${i.id},'reject')">拒绝</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    async function respond(id, action) {
+      const resp = await fetch(API_BASE + '/api/invitations/' + id + '/respond', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, Auth.getAuthHeaders()),
+        body: JSON.stringify({ action })
+      });
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); alert(e.error || '操作失败'); return; }
+      alert(action === 'accept' ? '已加入项目' : '已拒绝');
+      loadInvitations();
+    }
+    document.addEventListener('DOMContentLoaded', loadInvitations);
+  </script>
+</body>
+
+</html>

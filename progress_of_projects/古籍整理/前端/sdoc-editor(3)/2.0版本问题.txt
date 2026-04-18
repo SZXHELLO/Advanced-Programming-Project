@@ -1,0 +1,10 @@
+1.字形绘制区域只有中间一块能够绘图，该区域两侧均无法绘图，可绘图区域应该与显示出来的字形绘制区域同步随web窗口大小发生变化；
+2.“古汉字造字”在“使用说明”区域上方
+3.”导出选项“删除
+4.“编辑”界面左右栏设计成侧拉栏样式；左栏中的”页面“一栏显示的图片缩略图保持一列，并且配有上下滑动条，使得每个缩略图的大小不会因为图片太多而互相挤压变小；
+右栏删去”标注样式“字样所在的formgroup；
+右栏的”颜色“formgroup选择formgroup的selecttool和boxtool工具时不显示”颜色“formgroup，只在选择editor-toolbar中的其他工具时显示，记得加上”颜色“formgroup出现和消失的动画；
+右栏的“属性类型”只在选择editor-toolbar中的boxtool后出现，选择formgroup的其他工具时不显示”属性类型“formgroup，记得加上”属性类型“formgroup出现和消失的动画；
+右栏中，为custom-chars-section设计下拉栏，使得在造了字太多字后custom-char-item不会把custom-chars-section上边缘向上挤；
+为custom-chars-section区块的上边缘设计成可拖动边缘，使得使用者可以拖动该边缘来调整custom-chars-section高度以获得较好观感
+5.选中boxtool进行拉框操作时，每完成一个拉框操作自动固定该框的颜色和标注类型，阻止点击其他属性类型后改变该框的属性类型

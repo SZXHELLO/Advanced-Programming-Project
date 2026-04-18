@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目 | SDOC Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        .project-page {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: var(--space-md);
+            overflow: hidden;
+        }
+
+        .page-header {
+            margin-bottom: var(--space-md);
+            flex-shrink: 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: var(--space-md);
+            flex-wrap: wrap;
+        }
+
+        .page-header-main {
+            flex: 1;
+            min-width: min(100%, 280px);
+        }
+
+        .page-header-search {
+            display: inline-flex;
+            align-items: stretch;
+            flex-shrink: 0;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: #fff;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .page-header-search input {
+            border: none;
+            outline: none;
+            padding: 8px 12px;
+            font-size: 13px;
+            width: min(320px, 46vw);
+            min-width: 160px;
+            color: var(--color-text);
+            background: transparent;
+        }
+
+        .page-header-search input::placeholder {
+            color: var(--color-text-light);
+        }
+
+        .page-header-search button {
+            border: none;
+            border-left: 1px solid var(--color-border);
+            background: rgba(200, 74, 50, 0.08);
+            padding: 0 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-primary, #a0523a);
+            transition: background 0.15s ease;
+        }
+
+        .page-header-search button:hover {
+            background: rgba(200, 74, 50, 0.14);
+        }
+
+        .page-header-search button:focus-visible {
+            outline: 2px solid var(--color-primary-light);
+            outline-offset: -2px;
+        }
+
+        .page-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-top: -2px;
+        }
+
+        .page-desc {
+            color: var(--color-text-light);
+            font-size: 13px;
+        }
+
+        .project-card {
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-md);
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .project-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            border-bottom: 1px solid var(--color-border-light);
+        }
+
+        .project-card-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text);
+            margin-top: -12px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .project-list {
+            padding: var(--space-sm);
+            overflow: auto;
+            display: flex;
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            flex: 1;
+            flex-direction: column;
+            gap: var(--space-xs);
+            min-height: 0;
+        }
+
+        .project-item {
+            border: 1px solid var(--color-border-light);
+            border-radius: var(--radius-md);
+            background: #fff;
+            padding: var(--space-sm) var(--space-md);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 58px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .project-item:hover {
+            border-color: var(--color-primary-light);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .project-main {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .project-name {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--color-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 520px;
+        }
+
+        .project-meta {
+            font-size: 12px;
+            color: var(--color-text-light);
+            display: flex;
+            gap: var(--space-sm);
+            flex-wrap: wrap;
+        }
+
+        .project-check {
+            display: none;
+        }
+
+        .project-item.select-mode .project-check {
+            display: block;
+        }
+
+        .empty-tip {
+            text-align: center;
+            padding: 24px;
+            color: var(--color-text-light);
+            font-size: 13px;
+        }
+
+        .empty-tip:only-child {
+            margin: auto;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            gap: var(--space-sm);
+            margin-top: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .nav-buttons .btn {
+            flex: 1;
+            padding: var(--space-sm);
+        }
+    </style>
+</head>
+
+<body>
+    <header class="top-nav">
+        <a href="index.html" class="nav-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            <span>古籍编辑器</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                </svg>
+                首页
+            </a>
+            <a href="edit.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                编辑
+            </a>
+            <a href="project.html" class="nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                    <line x1="7" y1="16" x2="13" y2="16"></line>
+                </svg>
+                项目
+            </a>
+            <a href="createChar.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                </svg>
+                造字
+            </a>
+            <a href="exportXml.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                导出
+            </a>
+            <a href="upload.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                上传
+            </a>
+        </div>
+        <div class="nav-spacer"></div>
+    </header>
+
+    <main class="page-container">
+        <div class="project-page">
+            <div class="page-header">
+                <div class="page-header-main">
+                    <h1 class="page-title">项目管理</h1>
+                    <p class="page-desc">从后端 MySQL 查看、导入、下载与删除项目；已设为「公开」且您未加入的项目也会出现在列表中，可申请加入</p>
+                </div>
+                <div class="page-header-search" role="search">
+                    <input type="text" id="inviteLinkSearch" placeholder="粘贴邀请链接，回车或点搜索打开"
+                        autocomplete="off" spellcheck="false" inputmode="url"
+                        aria-label="邀请链接">
+                    <button type="button" id="inviteLinkSearchBtn" title="打开邀请链接" aria-label="搜索并打开邀请链接">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <section class="project-card">
+                <div class="project-card-header">
+                    <div class="project-card-title">已保存项目</div>
+                    <div class="header-actions">
+                        <button id="importBtn" class="btn btn-primary" style="display:none;" disabled>导入</button>
+                        <button id="downloadBtn" class="btn btn-outline" style="display:none;" disabled>下载</button>
+                        <button id="deleteBtn" class="btn btn-outline" style="display:none;" disabled>删除</button>
+                        <button id="toggleSelectBtn" class="btn btn-outline">选择</button>
+                    </div>
+                </div>
+                <div id="projectList" class="project-list"></div>
+            </section>
+
+            <!-- 导航按钮 -->
+            <div class="nav-buttons">
+                <a href="index.html" class="btn btn-outline">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg>
+                    返回首页
+                </a>
+                <a href="invitations.html" class="btn btn-outline">我的邀请</a>
+                <button type="button" id="publicProjectsBtn" class="btn btn-outline">浏览公开项目</button>
+                <a href="edit.html" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    跳转到编辑页
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <footer class="statusbar">
+        <div class="status-item"><span class="status-dot"></span><span id="statusText">项目页面</span></div>
+        <div class="status-item"><span>项目数: </span><span id="statusCount">0</span></div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/common.js"></script>
+    <script>
+        const API_BASE = window.SDOC_API_BASE || "http://localhost:8000";
+        const projectListEl = document.getElementById("projectList");
+        const toggleSelectBtn = document.getElementById("toggleSelectBtn");
+        const importBtn = document.getElementById("importBtn");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const deleteBtn = document.getElementById("deleteBtn");
+        const statusText = document.getElementById("statusText");
+        const statusCount = document.getElementById("statusCount");
+
+        let projects = [];
+        let selectMode = false;
+        const selectedIds = new Set();
+
+        function setStatus(text) {
+            statusText.textContent = text;
+        }
+
+        function formatDate(v) {
+            if (!v) return "-";
+            const d = new Date(v);
+            if (Number.isNaN(d.getTime())) return String(v);
+            return d.toLocaleString();
+        }
+
+        function refreshActionButtons() {
+            const selectedCount = selectedIds.size;
+            importBtn.disabled = selectedCount !== 1;
+            downloadBtn.disabled = selectedCount < 1;
+            deleteBtn.disabled = selectedCount < 1;
+        }
+
+        function renderList() {
+            statusCount.textContent = String(projects.length);
+            if (!projects.length) {
+                projectListEl.innerHTML = '<div class="empty-tip">暂无项目（请先登录或等待管理员公开项目）</div>';
+                refreshActionButtons();
+                return;
+            }
+
+            projectListEl.innerHTML = projects.map((p) => {
+                const checked = selectedIds.has(p.project_id) ? "checked" : "";
+                const modeClass = selectMode ? "select-mode" : "";
+                const rid = encodeURIComponent(p.project_id);
+                const pending = Number(p.pendingRequestsCount || 0);
+                const isDiscover = p.fromPublicListing === true;
+                const adminExtra = !isDiscover && p.userRole === "admin"
+                    ? `<button type="button" class="btn btn-outline" style="margin-left:8px;padding:4px 10px;font-size:12px;" data-action="members" data-pid="${rid}">成员管理${pending > 0 ? " (" + pending + ")" : ""}</button>`
+                    : "";
+                const leaveExtra = !isDiscover
+                    ? `<button type="button" class="btn btn-outline" style="margin-left:8px;padding:4px 10px;font-size:12px;" data-action="leave" data-pid="${rid}">退出项目</button>`
+                    : "";
+                const joinExtra = isDiscover
+                    ? (p.allowJoinRequests
+                        ? `<a href="project-join-request.html?id=${rid}" class="btn btn-outline" style="padding:4px 10px;font-size:12px;">申请加入</a>`
+                        : `<button type="button" disabled class="btn btn-outline" style="padding:4px 10px;font-size:12px;opacity:0.55;cursor:not-allowed;pointer-events:none;color:var(--color-text-light);border-color:var(--color-border);">不可申请</button>`)
+                    : "";
+                const roleMeta = isDiscover
+                    ? `<span>状态：公开 · 未加入</span>`
+                    : `<span>我的角色：${p.userRole || "-"}</span>`;
+                const checkHtml = !isDiscover
+                    ? `<input class="project-check" type="checkbox" ${checked} ${selectMode ? "" : "style='display:none'"} />`
+                    : "";
+                return `
+                <div class="project-item ${modeClass}" data-id="${p.project_id}" data-discover="${isDiscover ? "1" : ""}">
+                    <div class="project-main">
+                        <div class="project-name">${p.title || p.project_id}</div>
+                        <div class="project-meta">
+                            <span>作者：${p.author || "-"}</span>
+                            <span>保存时间：${formatDate(p.saved_at)}</span>
+                            ${roleMeta}
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                        ${adminExtra}
+                        ${leaveExtra}
+                        ${joinExtra}
+                        ${checkHtml}
+                    </div>
+                </div>
+                `;
+            }).join("");
+
+            projectListEl.querySelectorAll('[data-action="members"]').forEach((btn) => {
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const pid = decodeURIComponent(btn.getAttribute("data-pid") || "");
+                    if (pid) window.location.href = `project-members.html?id=${encodeURIComponent(pid)}`;
+                });
+            });
+
+            projectListEl.querySelectorAll('[data-action="leave"]').forEach((btn) => {
+                btn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const pid = decodeURIComponent(btn.getAttribute("data-pid") || "");
+                    if (!pid) return;
+                    if (!confirm("确定退出该项目？退出后需重新被邀请或申请通过才能再次加入。")) return;
+                    if (!window.Auth?.isLoggedIn()) {
+                        window.location.href = "login.html?redirect=" + encodeURIComponent("project.html");
+                        return;
+                    }
+                    try {
+                        const resp = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(pid)}/leave`, {
+                            method: "POST",
+                            headers: Object.assign(
+                                { "Content-Type": "application/json" },
+                                window.Auth.getAuthHeaders()
+                            ),
+                            body: "{}"
+                        });
+                        const data = await resp.json().catch(() => ({}));
+                        if (!resp.ok) {
+                            alert(data.error || "退出失败");
+                            return;
+                        }
+                        selectedIds.delete(pid);
+                        await loadProjects();
+                        setStatus("已退出该项目");
+                    } catch (err) {
+                        console.error(err);
+                        alert("退出失败，请稍后重试");
+                    }
+                });
+            });
+
+            if (selectMode) {
+                projectListEl.querySelectorAll(".project-item").forEach((item) => {
+                    const id = item.dataset.id;
+                    const checkbox = item.querySelector(".project-check");
+                    if (!checkbox) return;
+                    checkbox.addEventListener("change", () => {
+                        if (checkbox.checked) selectedIds.add(id);
+                        else selectedIds.delete(id);
+                        refreshActionButtons();
+                    });
+                });
+            }
+
+            refreshActionButtons();
+        }
+
+        async function loadProjects() {
+            try {
+                if (!window.Auth || !window.Auth.isLoggedIn()) {
+                    window.location.href = "login.html?redirect=" + encodeURIComponent("project.html");
+                    return;
+                }
+                setStatus("正在加载项目...");
+                const resp = await fetch(`${API_BASE}/api/projects`, {
+                    headers: window.Auth.getAuthHeaders()
+                });
+                if (resp.status === 401) {
+                    window.location.href = "login.html?redirect=" + encodeURIComponent("project.html");
+                    return;
+                }
+                if (!resp.ok) throw new Error("项目列表加载失败");
+                const data = await resp.json();
+                projects = Array.isArray(data?.projects) ? data.projects : [];
+                renderList();
+                setStatus("项目加载完成");
+            } catch (err) {
+                console.error(err);
+                projectListEl.innerHTML = '<div class="empty-tip">加载失败，请稍后重试</div>';
+                setStatus("加载失败");
+            }
+        }
+
+        function toggleSelectMode() {
+            selectMode = !selectMode;
+            selectedIds.clear();
+            importBtn.style.display = selectMode ? "inline-flex" : "none";
+            downloadBtn.style.display = selectMode ? "inline-flex" : "none";
+            deleteBtn.style.display = selectMode ? "inline-flex" : "none";
+            toggleSelectBtn.textContent = selectMode ? "取消" : "选择";
+            renderList();
+        }
+
+        async function importSelectedProject() {
+            if (selectedIds.size !== 1) return;
+            const projectId = Array.from(selectedIds)[0];
+            const sel = projects.find((x) => x.project_id === projectId);
+            if (sel && sel.fromPublicListing) {
+                alert("公开但未加入的项目无法直接导入，请先「申请加入」并由管理员批准。");
+                return;
+            }
+            try {
+                const resp = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/latest`, {
+                    headers: window.Auth.getAuthHeaders()
+                });
+                if (!resp.ok) throw new Error("项目导入失败");
+                const data = await resp.json();
+
+                const collabResp = await fetch(`${API_BASE}/api/collab/status?projectId=${encodeURIComponent(projectId)}`);
+                let onlineCount = 0;
+                if (collabResp.ok) {
+                    const collabData = await collabResp.json();
+                    onlineCount = Number(collabData?.onlineCount || 0);
+                }
+                // 稳定策略：导入项目即开启协同连接，在线人数仅用于初始展示。
+                const shouldEnableCollab = true;
+
+                AppState.project = data.project || null;
+                AppState.pages = Array.isArray(data.pages) ? data.pages : [];
+                AppState.annotations = Array.isArray(data.annotations) ? data.annotations : [];
+                AppState.customChars = Array.isArray(data.customChars) ? data.customChars : [];
+                AppState.currentPageIndex = 0;
+                AppState.save();
+
+                sessionStorage.setItem('sdoc_collab_project_id', projectId);
+                sessionStorage.setItem('sdoc_collab_enabled', shouldEnableCollab ? '1' : '0');
+                sessionStorage.setItem('sdoc_collab_online_hint', String(onlineCount + 1));
+
+                window.location.href = "edit.html";
+            } catch (err) {
+                console.error(err);
+                alert("导入失败，请重试");
+            }
+        }
+
+        async function downloadSelectedProjects() {
+            if (!selectedIds.size) return;
+            for (const id of selectedIds) {
+                try {
+                    const resp = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(id)}/download`, {
+                        headers: window.Auth.getAuthHeaders()
+                    });
+                    if (!resp.ok) throw new Error("下载失败");
+                    const blob = await resp.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${id}.sdocproj`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.error(e);
+                    alert("部分项目下载失败");
+                }
+            }
+        }
+
+        async function deleteSelectedProjects() {
+            if (!selectedIds.size) return;
+            if (!confirm(`确定删除选中的 ${selectedIds.size} 个项目吗？`)) return;
+
+            try {
+                const ids = Array.from(selectedIds);
+                const resp = await fetch(`${API_BASE}/api/projects`, {
+                    method: "DELETE",
+                    headers: Object.assign(
+                        { "Content-Type": "application/json" },
+                        window.Auth.getAuthHeaders()
+                    ),
+                    body: JSON.stringify({ projectIds: ids })
+                });
+                if (!resp.ok) throw new Error("删除失败");
+                projects = projects.filter((p) => !selectedIds.has(p.project_id));
+                selectedIds.clear();
+                renderList();
+                setStatus("删除完成");
+            } catch (err) {
+                console.error(err);
+                alert("删除失败，请稍后再试");
+            }
+        }
+
+        toggleSelectBtn.addEventListener("click", toggleSelectMode);
+        importBtn.addEventListener("click", importSelectedProject);
+        downloadBtn.addEventListener("click", downloadSelectedProjects);
+        deleteBtn.addEventListener("click", deleteSelectedProjects);
+        document.getElementById("publicProjectsBtn")?.addEventListener("click", async () => {
+            if (!window.Auth?.isLoggedIn()) {
+                window.location.href = "login.html";
+                return;
+            }
+            try {
+                const resp = await fetch(`${API_BASE}/api/projects/public`, {
+                    headers: window.Auth.getAuthHeaders()
+                });
+                const data = await resp.json().catch(() => ({}));
+                const list = Array.isArray(data.projects) ? data.projects : [];
+                if (!list.length) {
+                    alert("当前没有公开项目");
+                    return;
+                }
+                const lines = list.map((p) => `${p.title || p.project_id} (${p.project_id})`).join("\n");
+                alert("公开项目：\n" + lines);
+            } catch (e) {
+                alert("加载公开项目失败");
+            }
+        });
+        function extractInviteToken(raw) {
+            const s = String(raw || "").trim();
+            if (!s) return "";
+            try {
+                const u = new URL(s, window.location.href);
+                const t = u.searchParams.get("token");
+                if (t && t.trim()) return t.trim();
+            } catch (_) { /* ignore */ }
+            const q = s.indexOf("?");
+            if (q >= 0) {
+                try {
+                    const u2 = new URL(s.slice(q), window.location.origin);
+                    const t2 = u2.searchParams.get("token");
+                    if (t2 && t2.trim()) return t2.trim();
+                } catch (_) { /* ignore */ }
+            }
+            const m = s.match(/[?&]token=([^&\s#]+)/i);
+            if (m) {
+                try {
+                    return decodeURIComponent(m[1]);
+                } catch (_) {
+                    return m[1];
+                }
+            }
+            const hex = s.replace(/\s/g, "");
+            if (/^[a-fA-F0-9]{16,}$/.test(hex)) return hex;
+            return "";
+        }
+
+        function openInviteLinkFromSearch() {
+            const input = document.getElementById("inviteLinkSearch");
+            const token = extractInviteToken(input ? input.value : "");
+            if (!token) {
+                alert("无法识别邀请：请粘贴完整链接（含 token=）或仅粘贴邀请 token。");
+                return;
+            }
+            if (!window.Auth || !window.Auth.isLoggedIn()) {
+                sessionStorage.setItem("pendingInvitationToken", token);
+                window.location.href =
+                    "login.html?redirect=" + encodeURIComponent("join.html?token=" + encodeURIComponent(token));
+                return;
+            }
+            window.location.href = "join.html?token=" + encodeURIComponent(token);
+        }
+
+        document.getElementById("inviteLinkSearchBtn")?.addEventListener("click", openInviteLinkFromSearch);
+        document.getElementById("inviteLinkSearch")?.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                openInviteLinkFromSearch();
+            }
+        });
+
+        document.addEventListener("DOMContentLoaded", loadProjects);
+    </script>
+</body>
+
+</html>

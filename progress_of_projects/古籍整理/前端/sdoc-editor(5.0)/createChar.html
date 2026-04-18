@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>造字 | SDOC Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        .char-creation-page {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: var(--space-md);
+            overflow: hidden;
+        }
+
+        .page-header {
+            margin-bottom: var(--space-md);
+            flex-shrink: 0;
+        }
+
+        .page-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-xs);
+        }
+
+        .page-desc {
+            color: var(--color-text-light);
+            font-size: 13px;
+        }
+
+        .creation-area {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: var(--space-md);
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .canvas-section {
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-md);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .section-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .section-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--color-cinnabar);
+        }
+
+        .char-canvas-container {
+            flex: 1;
+            display: flex;
+            /* align-items: center;
+            justify-content: center; */
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: #fff;
+            min-height: 0;
+        }
+
+        #charCanvas {
+            cursor: crosshair;
+            width: 100%;
+            height: 100%;
+        }
+
+        .canvas-tools {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm);
+            background: var(--color-paper);
+            border-radius: var(--radius-sm);
+            margin-top: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .char-tool-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+        }
+
+        .char-tool-btn:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .char-tool-btn.active {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .char-tool-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .brush-size-control {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .brush-size-control label {
+            font-size: 12px;
+            color: var(--color-text-light);
+        }
+
+        .brush-size-control input[type="range"] {
+            width: 80px;
+        }
+
+        /* 右侧面板 */
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+            overflow: hidden;
+        }
+
+        .info-card {
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-md);
+        }
+
+        .preview-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .char-preview-large {
+            width: 120px;
+            height: 120px;
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-md);
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 56px;
+            font-family: 'Noto Serif SC', serif;
+            margin-bottom: var(--space-sm);
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .unicode-badge {
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            padding: var(--space-xs) var(--space-sm);
+            background: var(--color-paper);
+            border-radius: var(--radius-sm);
+            color: var(--color-azurite);
+        }
+
+        /* 字库列表 */
+        .char-library {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .char-library-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .library-char-item {
+            position: relative;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 20px;
+            font-family: 'Noto Serif SC', serif;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            overflow: hidden;
+        }
+
+        .library-char-delete {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(200, 74, 50, 0.9);
+            color: white;
+            border: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        /* 鼠标悬停在造字项上时显示删除按钮 */
+        .library-char-item:hover .library-char-delete {
+            opacity: 1;
+        }
+
+        .library-char-item:hover {
+            border-color: var(--color-azurite);
+            background: #fff;
+        }
+
+        .library-char-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            gap: var(--space-sm);
+            margin-top: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .nav-buttons .btn {
+            flex: 1;
+            padding: var(--space-sm);
+        }
+
+        /* 操作提示 */
+        .tips-section {
+            background: #FFF9E6;
+            border: 1px solid #F0E0B0;
+            border-radius: var(--radius-md);
+            padding: var(--space-sm);
+            margin-bottom: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .tips-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #8B6914;
+            margin-bottom: var(--space-xs);
+        }
+
+        .tips-list {
+            font-size: 11px;
+            color: #6B5914;
+            padding-left: var(--space-md);
+            margin: 0;
+        }
+
+        .tips-list li {
+            margin-bottom: 2px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 导航栏 -->
+    <header class="top-nav">
+        <a href="index.html" class="nav-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            <span>古籍编辑器</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                </svg>
+                首页
+            </a>
+            <a href="edit.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                编辑
+            </a>
+            <a href="project.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                    <line x1="7" y1="16" x2="13" y2="16"></line>
+                </svg>
+                项目
+            </a>
+            <a href="createChar.html" class="nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                </svg>
+                造字
+            </a>
+            <a href="exportXml.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                导出
+            </a>
+            <a href="upload.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                上传
+            </a>
+        </div>
+        <div class="nav-spacer"></div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="page-container">
+        <div class="char-creation-page">
+
+            <!-- 页面标题 -->
+            <div class="page-header">
+                <h1 class="page-title">古汉字造字</h1>
+                <p class="page-desc">为没有简体字对应的古汉字建立字形</p>
+            </div>
+
+            <!-- 操作提示 -->
+            <div class="tips-section">
+                <div class="tips-title">使用说明</div>
+                <ul class="tips-list">
+                    <li>在画布上绘制汉字字形，可以使用画笔或橡皮擦工具</li>
+                    <li>保存后，新造字将同步到编辑页供使用</li>
+                </ul>
+            </div>
+
+            <!-- 创建区域 -->
+            <div class="creation-area">
+                <!-- 画布区域 -->
+                <div class="canvas-section">
+                    <div class="section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                        </svg>
+                        字形绘制
+                    </div>
+                    <div class="char-canvas-container">
+                        <canvas id="charCanvas"></canvas>
+                    </div>
+                    <div class="canvas-tools">
+                        <button class="char-tool-btn active" id="brushTool" onclick="setCharTool('brush')"
+                            data-tooltip="画笔">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                            </svg>
+                        </button>
+                        <button class="char-tool-btn" id="eraserTool" onclick="setCharTool('eraser')"
+                            data-tooltip="橡皮擦">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path
+                                    d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.6 2.6c.8-.8 2-.8 2.8 0L21 7.2c.8.8.8 2 0 2.8L11 20">
+                                </path>
+                                <path d="M6 11l6 6"></path>
+                            </svg>
+                        </button>
+                        <div style="width: 1px; height: 24px; background: var(--color-border); margin: 0 4px;"></div>
+                        <div class="brush-size-control">
+                            <label>粗细:</label>
+                            <input type="range" id="brushSize" min="2" max="20" value="8"
+                                onchange="updateBrushSize(this.value)">
+                            <span id="brushSizeValue">8</span>
+                        </div>
+                        <div style="width: 1px; height: 24px; background: var(--color-border); margin: 0 4px;"></div>
+                        <button class="char-tool-btn" onclick="clearCharCanvas()" data-tooltip="清除">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path
+                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 右侧信息面板 -->
+                <div class="info-panel">
+                    <!-- 预览卡片 -->
+                    <div class="info-card">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            字形预览
+                        </div>
+                        <div class="preview-area">
+                            <div class="char-preview-large" id="charPreview">预览</div>
+                            <div class="unicode-badge" id="unicodeDisplay">U+E000</div>
+                        </div>
+                    </div>
+
+                    <!-- 字形名称 -->
+                    <div class="info-card">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                            字形信息
+                        </div>
+                        <div class="form-group" style="margin-bottom: var(--space-sm);">
+                            <input type="text" class="form-input" id="charNameInput" placeholder="为字形命名"
+                                style="font-size: 13px;">
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%;" onclick="saveCustomChar()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"
+                                height="14">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                <polyline points="7 3 7 8 15 8"></polyline>
+                            </svg>
+                            保存字形
+                        </button>
+                    </div>
+
+                    <!-- 字库列表 -->
+                    <div class="info-card"
+                        style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            已造字库
+                            <span style="margin-left: auto; font-size: 11px; color: var(--color-text-light);"
+                                id="charCount">0 个</span>
+                        </div>
+                        <div class="char-library">
+                            <div class="char-library-grid" id="charLibraryGrid">
+                                <div
+                                    style="grid-column: 1/-1; text-align: center; padding: 12px; color: var(--color-text-light); font-size: 12px;">
+                                    暂无造字</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导航按钮 -->
+            <div class="nav-buttons">
+                <a href="index.html" class="btn btn-outline">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg>
+                    返回首页
+                </a>
+                <a href="edit.html" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    跳转到编辑页
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部状态栏 -->
+    <footer class="statusbar">
+        <div class="status-item">
+            <span class="status-dot"></span>
+            <span>造字页面</span>
+        </div>
+        <div class="status-item">
+            <span>已造字数: </span>
+            <span id="statusCharCount">0</span>
+        </div>
+    </footer>
+
+    <script src="js/common.js"></script>
+    <script>
+        let charCanvas, charCtx;
+        let isDrawingChar = false;
+        let charTool = 'brush';
+        let brushSize = 8;
+
+        async function deleteCustomChar(charId) {
+            // 从全局状态中移除指定造字
+            AppState.customChars = AppState.customChars.filter(c => c.id !== charId);
+            AppState.save();                // 保存到 localStorage
+            updateCharLibrary();            // 刷新造字列表
+            setStatus('造字已删除');         // 可选：更新底部状态栏提示
+
+            try {
+                await fetch(`http://localhost:8000/api/custom-chars/${encodeURIComponent(charId)}`, {
+                    method: "DELETE"
+                });
+            } catch (e) {
+                console.warn("deleteCustomChar server sync failed:", e);
+            }
+        }
+
+        function resizeCanvas() {
+            const container = document.querySelector('.char-canvas-container');
+            const rect = container.getBoundingClientRect();
+
+            // 关键：让画布实际分辨率 = 容器显示大小
+            charCanvas.width = rect.width;
+            charCanvas.height = rect.height;
+
+            // 重新初始化画布样式（防止重置后丢失）
+            charCtx.fillStyle = '#fff';
+            charCtx.fillRect(0, 0, charCanvas.width, charCanvas.height);
+            charCtx.strokeStyle = '#000';
+            charCtx.lineWidth = brushSize;
+            charCtx.lineCap = 'round';
+            charCtx.lineJoin = 'round';
+        }
+
+        // 辅助函数：判断画布是否为空白（全白色背景）
+        function isCanvasBlank(canvas) {
+            const ctx = canvas.getContext('2d');
+            // 获取画布所有像素数据
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            // 遍历像素，检查是否存在非白色像素（白色RGBA: 255,255,255,255）
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+                if (r !== 255 || g !== 255 || b !== 255 || a !== 255) {
+                    return false; // 存在非白色像素 → 画布有内容
+                }
+            }
+            return true; // 全是白色 → 画布空白
+        }
+
+        async function init() {
+            charCanvas = document.getElementById('charCanvas');
+            charCtx = charCanvas.getContext('2d');
+
+            resizeCanvas();
+
+            charCtx.fillStyle = '#fff';
+            charCtx.fillRect(0, 0, charCanvas.width, charCanvas.height);
+            charCtx.strokeStyle = '#000';
+            charCtx.lineWidth = brushSize;
+            charCtx.lineCap = 'round';
+            charCtx.lineJoin = 'round';
+
+            charCanvas.addEventListener('mousedown', handleCharCanvasMouseDown);
+            charCanvas.addEventListener('mousemove', handleCharCanvasMouseMove);
+            charCanvas.addEventListener('mouseup', handleCharCanvasMouseUp);
+            charCanvas.addEventListener('mouseleave', handleCharCanvasMouseUp);
+
+            await loadCustomCharsFromServer();
+
+            updateCharLibrary();
+            updateUnicodeDisplay();
+            updateCharPreview();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        async function loadCustomCharsFromServer() {
+            try {
+                const resp = await fetch("http://localhost:8000/api/custom-chars");
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data?.customChars && Array.isArray(data.customChars)) {
+                    AppState.customChars = data.customChars;
+                    AppState.save(); // 同步缓存，避免页面刷新丢失
+                }
+            } catch (e) {
+                console.warn("loadCustomCharsFromServer failed:", e);
+            }
+        }
+
+        function handleCharCanvasMouseDown(e) {
+            isDrawingChar = true;
+            const rect = charCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            charCtx.beginPath();
+            charCtx.moveTo(x, y);
+        }
+
+        function handleCharCanvasMouseMove(e) {
+            if (!isDrawingChar) return;
+            const rect = charCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            charCtx.lineTo(x, y);
+            charCtx.stroke();
+        }
+
+        function handleCharCanvasMouseUp() {
+            isDrawingChar = false;
+            updateCharPreview();
+        }
+
+        function setCharTool(tool) {
+            charTool = tool;
+            document.getElementById('brushTool').classList.toggle('active', tool === 'brush');
+            document.getElementById('eraserTool').classList.toggle('active', tool === 'eraser');
+
+            if (tool === 'eraser') {
+                charCtx.globalCompositeOperation = 'destination-out';
+                charCtx.lineWidth = brushSize * 2;
+            } else {
+                charCtx.globalCompositeOperation = 'source-over';
+                charCtx.lineWidth = brushSize;
+            }
+        }
+
+        function updateBrushSize(value) {
+            brushSize = parseInt(value);
+            document.getElementById('brushSizeValue').textContent = value;
+
+            if (charTool === 'eraser') {
+                charCtx.lineWidth = brushSize * 2;
+            } else {
+                charCtx.lineWidth = brushSize;
+            }
+        }
+
+        function clearCharCanvas() {
+            charCtx.globalCompositeOperation = 'source-over';
+            charCtx.fillStyle = '#fff';
+            charCtx.fillRect(0, 0, charCanvas.width, charCanvas.height);
+            updateCharPreview();
+        }
+
+        function updateCharPreview() {
+            // 1. 获取预览容器和主画布
+            const previewContainer = document.getElementById('charPreview');
+            // 请替换为你实际的主画布选择器（比如 .main-canvas / .char-canvas 等）
+            const charCanvas = document.getElementById('charCanvas');
+
+            /* // 调试：确认元素是否获取成功（可在控制台查看）
+            console.log('预览容器:', previewContainer);
+            console.log('主画布:', charCanvas);
+            if (!previewContainer || !charCanvas) return; */
+
+            //  判断画布是否空白
+            const isBlank = isCanvasBlank(charCanvas);
+
+            //  空白时：显示「预览」文字 + 清除背景图
+            if (isBlank) {
+                previewContainer.textContent = '预览';
+                previewContainer.style.backgroundImage = 'none';
+                return; // 直接结束，不需要绘制预览图
+            }
+
+
+            // 2. 获取预览容器的实际显示尺寸（保证预览图和容器1:1对应）
+            const dpr = window.devicePixelRatio || 1;
+            const rect = previewContainer.getBoundingClientRect();
+            const previewWidth = rect.width;
+            const previewHeight = rect.height;
+
+            // 3. 创建临时画布生成清晰预览（避免直接拉伸模糊）
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = previewWidth * dpr;  // 预览图分辨率 = 容器显示尺寸
+            tempCanvas.height = previewHeight * dpr;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.scale(dpr, dpr);
+
+            // 4. 清空预览画布（白色背景）
+            tempCtx.fillStyle = '#ffffff';
+            tempCtx.fillRect(0, 0, previewWidth, previewHeight);
+
+            // 5. 关键：关闭图像平滑，让笔画边缘清晰锐利（解决发虚）
+            tempCtx.imageSmoothingEnabled = false;
+            // 兼容旧浏览器
+            tempCtx.mozImageSmoothingEnabled = false;
+            tempCtx.webkitImageSmoothingEnabled = false;
+            tempCtx.msImageSmoothingEnabled = false;
+
+            // 6. 等比例缩放主画布到预览框，保持字形比例并居中
+            const scale = Math.min(
+                previewWidth / charCanvas.width,
+                previewHeight / charCanvas.height
+            );
+            const offsetX = (previewWidth - charCanvas.width * scale) / 2;
+            const offsetY = (previewHeight - charCanvas.height * scale) / 2;
+
+            // 7. 绘制主画布内容到预览画布
+            tempCtx.drawImage(
+                charCanvas,
+                0, 0, charCanvas.width, charCanvas.height, // 源：主画布完整内容
+                offsetX, offsetY, // 目标：预览框居中位置
+                charCanvas.width * scale, charCanvas.height * scale // 目标：等比例缩放后的尺寸
+            );
+
+            // 8. 将清晰预览图设置为预览容器背景
+            const dataURL = tempCanvas.toDataURL('image/png');
+            previewContainer.style.backgroundImage = `url(${dataURL})`;
+            previewContainer.style.backgroundSize = 'contain';
+            previewContainer.style.backgroundPosition = 'center';
+            previewContainer.style.backgroundRepeat = 'no-repeat';
+
+            previewContainer.textContent = '';
+        }
+
+        function updateUnicodeDisplay() {
+            const base = 0xE000;
+            const maxUnicode = AppState.customChars.reduce((max, c) => {
+                const u = Number(c?.unicode);
+                return Number.isFinite(u) ? Math.max(max, u) : max;
+            }, base - 1);
+            const nextUnicode = maxUnicode + 1;
+            document.getElementById('unicodeDisplay').textContent =
+                'U+' + nextUnicode.toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        async function requestNextUnicode() {
+            const resp = await fetch("http://localhost:8000/api/custom-chars/next-unicode");
+            if (!resp.ok) throw new Error("failed to get next unicode");
+            const data = await resp.json();
+            return Number(data?.nextUnicode);
+        }
+
+        async function saveCustomChar() {
+            const name = document.getElementById('charNameInput').value.trim();
+            if (!name) {
+                alert('请输入字形名称');
+                return;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 64;
+            tempCanvas.height = 64;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(charCanvas, 0, 0, 64, 64);
+
+            let nextUnicode;
+            try {
+                nextUnicode = await requestNextUnicode();
+            } catch (e) {
+                alert('获取 Unicode 失败，请重试');
+                return;
+            }
+
+            const customChar = {
+                id: 'char_' + Date.now(),
+                unicode: nextUnicode,
+                name: name,
+                imageData: tempCanvas.toDataURL()
+            };
+
+            AppState.customChars.push(customChar);
+            AppState.save();
+
+            // 尽量同步到数据库；失败不阻断本地体验
+            try {
+                await fetch("http://localhost:8000/api/custom-chars", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ customChar })
+                });
+            } catch (e) {
+                console.warn("saveCustomChar server sync failed:", e);
+            }
+
+            clearCharCanvas();
+            document.getElementById('charNameInput').value = '';
+
+            updateCharLibrary();
+            updateUnicodeDisplay();
+
+            alert('字形保存成功！可前往编辑页使用该字形。');
+        }
+
+        function updateCharLibrary() {
+            const container = document.getElementById('charLibraryGrid');
+            document.getElementById('charCount').textContent = AppState.customChars.length + ' 个';
+            document.getElementById('statusCharCount').textContent = AppState.customChars.length;
+
+            if (AppState.customChars.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 12px; color: var(--color-text-light); font-size: 12px;">暂无造字</div>';
+                return;
+            }
+
+            /* container.innerHTML = AppState.customChars.map(char => `
+                <div class="library-char-item" title="${char.name}">
+                    <img src="${char.imageData}" alt="${char.name}">
+                </div>
+            `).join(''); */
+
+            container.innerHTML = AppState.customChars.map(char => `
+                <div class="library-char-item" title="${char.name}">
+                    <img src="${char.imageData}" alt="${char.name}">
+                    <button class="library-char-delete" onclick="event.stopPropagation(); deleteCustomChar('${char.id}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        window.onload = init;
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .inland-security-footer {
+            position: fixed;
+            z-index: 10;
+            bottom: 0;
+            right: 0;
+            width: fit-content;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .tooltip-container {
+            position: relative;
+        }
+
+        .trigger-content {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            background-color: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .minimax-link {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 300;
+            color: #adadad;
+            text-decoration: none;
+        }
+
+        .minimax-link:visited {
+            color: #adadad;
+        }
+
+        .minimax-link:hover {
+            color: #666666;
+        }
+
+        .tooltip-content {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            padding-bottom: 16px;
+            /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+            font-size: 12px;
+            line-height: 17px;
+            background-color: #fafafa;
+            border-radius: 12px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            color: #171717;
+        }
+
+        /* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            right: 0;
+            height: 16px;
+        }
+
+        .tooltip-container:hover .tooltip-content {
+            display: flex;
+        }
+
+        .info-section {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .beian-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: #171717;
+        }
+
+        .beian-icon {
+            width: 14px;
+            height: 14px;
+            margin-right: 2px;
+        }
+
+        .underline-text {
+            color: #171717;
+            text-decoration: underline;
+        }
+
+        .underline-text:hover {
+            color: #000000;
+        }
+
+        /* 深色模式支持 */
+        @media (prefers-color-scheme: dark) {
+            .trigger-content {
+                background-color: transparent;
+            }
+
+            .minimax-link,
+            .minimax-link:visited {
+                color: #666666;
+            }
+
+            .minimax-link:hover {
+                color: #adadad;
+            }
+
+            .tooltip-content {
+                background-color: #262626;
+                color: #ededed;
+            }
+
+            .beian-link,
+            .underline-text {
+                color: #ededed;
+            }
+
+            .underline-text:hover {
+                color: #ffffff;
+            }
+        }
+    </style>
+    <!-- <div class="inland-security-footer">
+        <div class="tooltip-container">
+            <div class="trigger-content">
+                <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+                    <span>© 2026 MiniMax</span>
+                </a>
+            </div>
+            <div class="tooltip-content">
+                <section class="info-section">
+                    <span>上海稀宇科技有限公司</span>
+                </section>
+
+                <section class="info-section">
+                    <a class="beian-link"
+                        href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179"
+                        target="_blank" rel="noreferrer">
+                        <img alt="hailuo-beian-icon"
+                            src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png"
+                            class="beian-icon">
+                        <span class="underline-text">沪公网安备31010402010179号</span>
+                    </a>
+                    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+                        沪ICP备2023003282号-38
+                    </a>
+                </section>
+
+                <section class="info-section">
+                    <span>模型名称：MiniMax</span>
+                    <span>备案号：Shanghai-MiniMax-202505230046</span>
+                </section>
+
+                <section class="info-section">
+                    <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer"
+                        class="underline-text">
+                        用户协议
+                    </a>
+                    <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer"
+                        class="underline-text">
+                        隐私政策
+                    </a>
+                </section>
+            </div>
+        </div>
+    </div> -->
+
+</body>
+
+</html>

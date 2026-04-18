@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 | 古籍在线编辑器</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background: linear-gradient(135deg, #f5f1eb 0%, #ece7dd 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-lg);
+    }
+
+    .auth-shell {
+      width: min(1080px, 100%);
+      min-height: 640px;
+      border: 1px solid var(--color-border);
+      border-radius: 28px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 16px 36px rgba(44, 44, 44, 0.16);
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+    }
+
+    .auth-panel-left {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 56px 56px 44px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .auth-brand {
+      font-family: 'Noto Serif SC', serif;
+      color: var(--color-ink);
+      font-weight: 600;
+      font-size: 20px;
+      letter-spacing: 1px;
+      margin-bottom: 48px;
+    }
+
+    .auth-title {
+      font-family: 'Noto Serif SC', serif;
+      color: var(--color-ink);
+      font-size: 36px;
+      margin: 0 0 10px;
+    }
+
+    .auth-subtitle {
+      color: var(--color-text-light);
+      font-size: 13px;
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    #loginForm {
+      margin-top: 8px;
+    }
+
+    .login-btn {
+      width: 100%;
+      margin-top: var(--space-sm);
+      padding: 12px var(--space-lg);
+      font-size: 15px;
+      border-radius: 999px;
+    }
+
+    .register-entry {
+      display: inline-flex;
+      margin: -2px 0 6px;
+      font-size: 12px;
+      color: var(--color-azurite);
+      text-decoration: none;
+      cursor: pointer;
+      border-bottom: 1px solid transparent;
+      transition: all var(--transition-fast);
+    }
+
+    .register-entry:hover {
+      color: var(--color-cinnabar);
+      border-bottom-color: var(--color-cinnabar);
+    }
+
+    .register-modal {
+      width: min(460px, 92vw);
+    }
+
+    .register-tip {
+      font-size: 12px;
+      color: var(--color-text-light);
+      margin-top: var(--space-sm);
+    }
+
+    .auth-hint {
+      margin-top: 20px;
+      min-height: 20px;
+      font-size: 12px;
+      color: var(--color-text-light);
+    }
+
+    .auth-hint.error {
+      color: var(--color-cinnabar);
+    }
+
+    .auth-hint.success {
+      color: var(--color-bamboo);
+    }
+
+    .auth-help {
+      margin-top: auto;
+      text-align: center;
+      color: var(--color-text-light);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .auth-panel-right {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(125deg, rgba(245, 240, 232, 0.2), rgba(43, 95, 142, 0.15)),
+        radial-gradient(circle at 24% 22%, rgba(91, 140, 90, 0.22), transparent 56%),
+        linear-gradient(150deg, #ebe8e1 0%, #d8d5ce 100%);
+    }
+
+    .auth-panel-right::before {
+      content: "";
+      position: absolute;
+      inset: 7% 12% 8% 10%;
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.32) 58%, rgba(255, 255, 255, 0.12)),
+        linear-gradient(160deg, rgba(44, 44, 44, 0.08), rgba(44, 44, 44, 0.02));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+    }
+
+    .auth-panel-right::after {
+      content: "";
+      position: absolute;
+      width: 220px;
+      height: 220px;
+      right: -40px;
+      bottom: -40px;
+      border-radius: 48px;
+      background: linear-gradient(135deg, rgba(200, 74, 50, 0.15), rgba(43, 95, 142, 0.18));
+      filter: blur(2px);
+      transform: rotate(12deg);
+    }
+
+    .auth-quote {
+      position: absolute;
+      left: 18%;
+      bottom: 24%;
+      z-index: 1;
+      width: min(360px, 68%);
+      padding: 22px 24px;
+      border-radius: 18px;
+      background: rgba(44, 44, 44, 0.34);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      box-shadow: var(--shadow-md);
+    }
+
+    .auth-quote h3 {
+      margin: 0 0 10px;
+      font-family: 'Noto Serif SC', serif;
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .auth-quote p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.8;
+      opacity: 0.9;
+    }
+
+    @media (max-width: 920px) {
+      .auth-shell {
+        grid-template-columns: 1fr;
+        min-height: 560px;
+      }
+
+      .auth-panel-right {
+        min-height: 260px;
+      }
+
+      .auth-quote {
+        left: 8%;
+        right: 8%;
+        width: auto;
+        bottom: 14%;
+      }
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: var(--space-md);
+      }
+
+      .auth-panel-left {
+        padding: 34px 22px 26px;
+      }
+
+      .auth-brand {
+        margin-bottom: 24px;
+      }
+
+      .auth-title {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="auth-shell">
+    <section class="auth-panel-left">
+      <div class="auth-brand">古籍在线编辑器</div>
+      <h1 class="auth-title">欢迎登录</h1>
+      <p class="auth-subtitle">请使用项目账号登录后进入编辑空间，后续可用于多人实时协同与操作追踪。</p>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="usernameInput">账号</label>
+          <input class="form-input" id="usernameInput" name="username" type="text" placeholder="请输入账号"
+            autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="passwordInput">密码</label>
+          <input class="form-input" id="passwordInput" name="password" type="password" placeholder="请输入密码"
+            autocomplete="current-password" required>
+        </div>
+        <a id="openRegisterBtn" class="register-entry" href="javascript:void(0)">注册</a>
+        <button class="btn btn-primary login-btn" type="submit">登录并进入系统</button>
+      </form>
+
+      <div id="loginHint" class="auth-hint"></div>
+
+      <div class="auth-help">
+        <div>古籍 Online Editor | 基于 SDOC 标准</div>
+        <div>山东大学 “文史见长” 学术传统</div>
+      </div>
+    </section>
+
+    <section class="auth-panel-right" aria-hidden="true">
+      <div class="auth-quote">
+        <h3>协同整理，让古籍数字化更可靠</h3>
+        <p>统一登录身份可用于后续多人实时编辑、修订记录与操作溯源，帮助团队高质量完成整理工作。</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="registerModal">
+    <div class="modal register-modal">
+      <div class="modal-header">
+        <h3 class="modal-title">账号注册</h3>
+        <button class="modal-close" id="closeRegisterBtn" type="button" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="registerForm">
+          <div class="form-group">
+            <label class="form-label" for="registerUsernameInput">账号</label>
+            <input class="form-input" id="registerUsernameInput" type="text" placeholder="请输入账号（4-20位，字母/数字/下划线）"
+              required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="registerDisplayNameInput">昵称</label>
+            <input class="form-input" id="registerDisplayNameInput" type="text" placeholder="请输入昵称" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="registerPasswordInput">密码</label>
+            <input class="form-input" id="registerPasswordInput" type="password" placeholder="请输入密码，至少6位" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="registerPasswordConfirmInput">确认密码</label>
+            <input class="form-input" id="registerPasswordConfirmInput" type="password" placeholder="请再次输入密码" required>
+          </div>
+          <div class="register-tip" id="registerHint">提交后将创建新账号（当前仅弹窗交互，后续可接入注册接口）。</div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" id="cancelRegisterBtn" type="button">取消</button>
+            <button class="btn btn-primary" id="registerSubmitBtn" type="submit">提交注册</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script>
+    (function () {
+      var modal = document.getElementById('registerModal');
+      var openBtn = document.getElementById('openRegisterBtn');
+      var closeBtn = document.getElementById('closeRegisterBtn');
+      var cancelBtn = document.getElementById('cancelRegisterBtn');
+      var form = document.getElementById('registerForm');
+      var hint = document.getElementById('registerHint');
+      var registerSubmitBtn = document.getElementById('registerSubmitBtn');
+      var loginUsernameInput = document.getElementById('usernameInput');
+      var loginPasswordInput = document.getElementById('passwordInput');
+
+      function openModal() {
+        if (modal) modal.classList.add('active');
+      }
+
+      function closeModal() {
+        if (modal) modal.classList.remove('active');
+      }
+
+      if (openBtn) openBtn.addEventListener('click', openModal);
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+      if (form) {
+        form.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var username = document.getElementById('registerUsernameInput').value.trim();
+          var displayName = document.getElementById('registerDisplayNameInput').value.trim();
+          var pwd = document.getElementById('registerPasswordInput').value;
+          var confirmPwd = document.getElementById('registerPasswordConfirmInput').value;
+          var usernameReg = /^[A-Za-z0-9_]{4,20}$/;
+
+          if (!usernameReg.test(username)) {
+            hint.textContent = '账号需为4-20位字母、数字或下划线。';
+            hint.style.color = 'var(--color-cinnabar)';
+            return;
+          }
+          if (!displayName) {
+            hint.textContent = '请输入昵称。';
+            hint.style.color = 'var(--color-cinnabar)';
+            return;
+          }
+          if (pwd.length < 6) {
+            hint.textContent = '密码至少需要6位。';
+            hint.style.color = 'var(--color-cinnabar)';
+            return;
+          }
+          if (pwd !== confirmPwd) {
+            hint.textContent = '两次输入的密码不一致，请重新确认。';
+            hint.style.color = 'var(--color-cinnabar)';
+            return;
+          }
+
+          hint.textContent = '正在注册...';
+          hint.style.color = 'var(--color-text-light)';
+          if (registerSubmitBtn) registerSubmitBtn.disabled = true;
+
+          try {
+            if (!window.Auth || typeof window.Auth.register !== 'function') {
+              throw new Error('注册服务不可用，请稍后重试');
+            }
+            await window.Auth.register({
+              username: username,
+              displayName: displayName,
+              password: pwd,
+              confirmPassword: confirmPwd
+            });
+
+            hint.textContent = '注册成功，请使用新账号登录。';
+            hint.style.color = 'var(--color-bamboo)';
+
+            form.reset();
+            if (loginUsernameInput) {
+              loginUsernameInput.value = username;
+            }
+            closeModal();
+            if (loginPasswordInput) {
+              loginPasswordInput.focus();
+            }
+          } catch (err) {
+            hint.textContent = err && err.message ? err.message : '注册失败，请稍后重试。';
+            hint.style.color = 'var(--color-cinnabar)';
+          } finally {
+            if (registerSubmitBtn) registerSubmitBtn.disabled = false;
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+
+</html>

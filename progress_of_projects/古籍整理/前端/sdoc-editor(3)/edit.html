@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>古籍编辑 | SDOC Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        /* 编辑页特有样式 */
+        .edit-layout {
+            display: flex;
+            height: calc(100vh - 56px - 32px);
+        }
+
+        /* 左侧面板 */
+        .edit-left-panel {
+            width: 260px;
+            background: #fff;
+            border-right: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-section {
+            padding: var(--space-sm);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .panel-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .panel-title svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-cinnabar);
+        }
+
+        .project-actions {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .project-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            padding: var(--space-xs) var(--space-sm);
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+            width: 100%;
+            text-align: left;
+        }
+
+        .project-btn:hover {
+            background: #EDE8E0;
+            border-color: var(--color-azurite);
+        }
+
+        .project-btn svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-azurite);
+        }
+
+        .thumbnail-list {
+            flex: 1;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: var(--space-xs);
+            overflow-y: auto;
+            padding: var(--space-xs);
+        }
+
+        .thumbnail-item {
+            position: relative;
+            width: 100%;
+            height: auto;
+            flex: 0 0 auto;
+            margin-bottom: 0;
+            border: 2px solid transparent;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .thumbnail-item:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .thumbnail-item.active {
+            border-color: var(--color-cinnabar);
+            box-shadow: 0 0 0 2px rgba(200, 74, 50, 0.2);
+        }
+
+        .thumbnail-item img {
+            width: 100%;
+            display: block;
+            height: auto;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        .thumbnail-page {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
+
+        .thumbnail-delete {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(200, 74, 50, 0.9);
+            color: white;
+            border: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .thumbnail-item:hover .thumbnail-delete {
+            opacity: 1;
+        }
+
+        /* 主编辑区域 */
+        .edit-main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #E8E4DC;
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            background: #fff;
+            padding: var(--space-xs) var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .page-nav {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .page-nav-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+        }
+
+        .page-nav-btn:hover:not(:disabled) {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .page-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-nav-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .page-indicator {
+            font-size: 12px;
+            color: var(--color-text);
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            margin-left: auto;
+        }
+
+        .zoom-value {
+            font-size: 12px;
+            color: var(--color-text-light);
+            min-width: 45px;
+            text-align: center;
+        }
+
+        /* 画布容器 */
+        .canvas-container {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-md);
+            position: relative;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            background: #fff;
+            box-shadow: var(--shadow-lg);
+            transform-origin: center center;
+        }
+
+        #mainCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #annotationLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        #interactionLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+        }
+
+        /* 右侧面板 */
+        .edit-right-panel {
+            width: 300px;
+            background: #fff;
+            border-left: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .property-section {
+            padding: var(--space-sm);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .property-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-ink);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            margin-bottom: var(--space-sm);
+        }
+
+        .property-title svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-cinnabar);
+        }
+
+        .mark-type-selector {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .mark-type-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: var(--space-xs);
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 10px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .mark-type-btn:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .mark-type-btn.active {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .mark-type-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* 属性类型选择器 */
+        .attr-type-selector {
+            display: flex;
+            gap: var(--space-xs);
+            margin-top: var(--space-sm);
+        }
+
+        .attr-type-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: var(--space-xs);
+            background: var(--color-paper);
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .attr-type-btn:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .attr-type-btn.active {
+            color: white;
+            border-color: transparent;
+        }
+
+        .attr-type-btn[data-type="字"].active {
+            background: var(--mark-red);
+        }
+
+        .attr-type-btn[data-type="词"].active {
+            background: var(--mark-blue);
+        }
+
+        .attr-type-btn[data-type="句子"].active {
+            background: var(--mark-green);
+        }
+
+        .attr-type-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-bottom: 2px;
+        }
+
+        .annotation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-xs);
+        }
+
+        .annotation-card {
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: var(--space-sm);
+            margin-bottom: var(--space-xs);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .annotation-card:hover {
+            border-color: var(--color-azurite);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .annotation-card.selected {
+            border-color: var(--color-cinnabar);
+            background: #FDF8F7;
+        }
+
+        .annotation-preview {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .annotation-char {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 20px;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .annotation-info {
+            flex: 1;
+        }
+
+        .annotation-simplified {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-ink);
+            margin-bottom: 2px;
+        }
+
+        .annotation-type {
+            font-size: 10px;
+            color: var(--color-text-light);
+        }
+
+        .annotation-actions {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .annotation-action-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text-light);
+            transition: all var(--transition-fast);
+        }
+
+        .annotation-action-btn:hover {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .annotation-action-btn.delete:hover {
+            background: var(--color-cinnabar);
+            border-color: var(--color-cinnabar);
+        }
+
+        .annotation-action-btn svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* 造字区 */
+        .custom-chars-section {
+            max-height: 180px;
+            overflow: auto;
+            border-top: 1px solid var(--color-border);
+            padding: var(--space-sm);
+        }
+
+        .custom-chars-grid {
+
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .custom-char-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 20px;
+            font-family: 'Noto Serif SC', serif;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            overflow: hidden;
+        }
+
+        .custom-char-item:hover {
+            border-color: var(--color-azurite);
+            background: #fff;
+        }
+
+        .custom-char-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 导航栏 -->
+    <header class="top-nav">
+        <a href="index.html" class="nav-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            <span>古籍编辑器</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                </svg>
+                首页
+            </a>
+            <a href="edit.html" class="nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                编辑
+            </a>
+            <a href="createChar.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                </svg>
+                造字
+            </a>
+            <!-- <a href="exportXml.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                导出
+            </a> -->
+
+            <a onclick="handleExportXML()" class="nav-link" style="cursor: pointer;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                导出
+            </a>
+
+
+            <a href="upload.html" class="nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                上传
+            </a>
+        </div>
+        <div class="nav-spacer"></div>
+        <button class="btn btn-secondary" onclick="document.getElementById('importImageInput').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            导入
+        </button>
+        <button class="btn btn-primary" onclick="saveProject()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            保存
+        </button>
+    </header>
+
+    <!-- 主编辑区 -->
+    <div class="edit-layout">
+        <!-- 左侧面板 -->
+        <aside class="edit-left-panel">
+            <div class="panel-section">
+                <h3 class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    项目
+                </h3>
+                <div class="project-actions">
+                    <button class="project-btn" onclick="createNewProject()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                        新建
+                    </button>
+                    <button class="project-btn" onclick="document.getElementById('openProjectInput').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                            </path>
+                        </svg>
+                        打开
+                    </button>
+                    <!-- <button class="project-btn" onclick="window.location.href='exportXml.html'"> -->
+                    <button class="project-btn" onclick="handleExportXML() ">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        导出XML
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel-section" style="padding-bottom: 0;">
+                <h3 class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    页面
+                </h3>
+            </div>
+            <div class="thumbnail-list" id="thumbnailList"></div>
+        </aside>
+
+        <!-- 主编辑区域 -->
+        <main class="edit-main-area">
+            <div class="editor-toolbar">
+                <div class="tool-group">
+                    <button class="tool-btn active" id="selectTool" data-tooltip="选择" onclick="setTool('select')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="boxTool" data-tooltip="框选" onclick="setTool('box')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        </svg>
+                    </button>
+                    <!-- <button class="tool-btn" id="underlineTool" data-tooltip="下划线" onclick="setTool('underline')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path>
+                            <line x1="4" y1="21" x2="20" y2="21"></line>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="highlightTool" data-tooltip="高亮" onclick="setTool('highlight')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="strikethroughTool" data-tooltip="删除线"
+                        onclick="setTool('strikethrough')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="4" y1="12" x2="20" y2="12"></line>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="slashTool" data-tooltip="斜线" onclick="setTool('slash')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="19" x2="19" y2="5"></line>
+                        </svg>
+                    </button> -->
+                </div>
+
+                <div class="tool-group">
+                    <button class="tool-btn" data-tooltip="撤销" onclick="undoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 7v6h6"></path>
+                            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tooltip="重做" onclick="redoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 7v6h-6"></path>
+                            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="page-nav">
+                    <button class="page-nav-btn" onclick="goToFirstPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="11 17 6 12 11 7"></polyline>
+                            <polyline points="18 17 13 12 18 7"></polyline>
+                        </svg>
+                    </button>
+                    <button class="page-nav-btn" onclick="goToPrevPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <span class="page-indicator" id="pageIndicator">1 / 1</span>
+                    <button class="page-nav-btn" onclick="goToNextPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                    <button class="page-nav-btn" onclick="goToLastPage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="13 17 18 12 13 7"></polyline>
+                            <polyline points="6 17 11 12 6 7"></polyline>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="zoom-controls">
+                    <button class="tool-btn" onclick="zoomOut()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                    <span class="zoom-value" id="zoomValue">100%</span>
+                    <button class="tool-btn" onclick="zoomIn()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="11" y1="8" x2="11" y2="14"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 画布区域 -->
+            <div class="canvas-container" id="canvasContainer">
+                <div class="empty-state" id="emptyState">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    <h3>欢迎使用古籍编辑器</h3>
+                    <p>请新建项目或导入古籍图片开始编辑</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('importImageInput').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"
+                            height="14">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        导入图片
+                    </button>
+                </div>
+                <div class="canvas-wrapper" id="canvasWrapper" style="display: none;">
+                    <canvas id="mainCanvas"></canvas>
+                    <canvas id="annotationLayer"></canvas>
+                    <canvas id="interactionLayer"></canvas>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧面板 -->
+        <aside class="edit-right-panel">
+            <div class="property-section">
+                <h3 class="property-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    属性编辑
+                </h3>
+
+                <div class="form-group" style="margin-bottom: var(--space-xs);">
+                    <label class="form-label">简体字</label>
+                    <input type="text" class="form-input" id="simplifiedCharInput" placeholder="输入简体字"
+                        style="font-size: 13px; padding: 6px 10px;" oninput="updateAnnotationSimplified(this.value)">
+                </div>
+
+                <div class="form-group" style="margin-bottom: var(--space-xs);">
+                    <label class="form-label">颜色</label>
+                    <div class="color-picker-group" id="colorPicker">
+                        <div class="color-swatch selected" style="background: #C84A32;" data-color="#C84A32"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #2B5F8E;" data-color="#2B5F8E"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #5B8C5A;" data-color="#5B8C5A"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #E8C547;" data-color="#E8C547"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #7B5BA6;" data-color="#7B5BA6"
+                            onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: #D67B3C;" data-color="#D67B3C"
+                            onclick="selectColor(this)"></div>
+                    </div>
+                </div>
+
+                <!-- <div class="form-group" style="margin-bottom: var(--space-xs);">
+                    <label class="form-label">标注样式</label>
+                    <div class="mark-type-selector" id="markTypeSelector">
+                        <button class="mark-type-btn active" data-type="box" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            </svg>
+                            框选
+                        </button>
+                        <button class="mark-type-btn" data-type="underline" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path>
+                                <line x1="4" y1="21" x2="20" y2="21"></line>
+                            </svg>
+                            下划线
+                        </button>
+                        <button class="mark-type-btn" data-type="highlight" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            高亮
+                        </button>
+                        <button class="mark-type-btn" data-type="strikethrough" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="4" y1="12" x2="20" y2="12"></line>
+                            </svg>
+                            删除线
+                        </button>
+                    </div>
+                </div> -->
+
+                <!-- 属性类型选择器（仅框选标注显示） -->
+                <div class="form-group" id="attrTypeContainer" style="display: none;">
+                    <label class="form-label">属性类型</label>
+                    <div class="attr-type-selector">
+                        <button class="attr-type-btn active" data-type="字" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-red);"></span>
+                            字
+                        </button>
+                        <button class="attr-type-btn" data-type="词" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-blue);"></span>
+                            词
+                        </button>
+                        <button class="attr-type-btn" data-type="句子" onclick="selectAttrType(this)">
+                            <span class="attr-type-indicator" style="background: var(--mark-green);"></span>
+                            句子
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">注释</label>
+                    <textarea class="form-input" id="annotationNoteInput" placeholder="输入注释"
+                        style="font-size: 12px; padding: 6px 10px; min-height: 50px;"
+                        oninput="updateAnnotationNote(this.value)"></textarea>
+                </div>
+            </div>
+
+            <div class="property-section"
+                style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 0;">
+                <h3 class="property-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    标注
+                    <span style="margin-left: auto; font-size: 11px; color: var(--color-text-light);"
+                        id="annotationCount">0条</span>
+                </h3>
+                <div class="annotation-list" id="annotationList"></div>
+            </div>
+
+            <div class="custom-chars-section">
+                <h3 class="property-title" style="cursor: pointer;" onclick="window.location.href='createChar.html'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    造字
+                    <span style="margin-left: auto; font-size: 11px; color: var(--color-text-light);"
+                        id="customCharCount">0个</span>
+                </h3>
+                <div class="custom-chars-grid" id="customCharsGrid"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="statusbar">
+        <div class="status-item">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">就绪</span>
+        </div>
+        <div class="status-item">
+            <span>页:</span>
+            <span id="statusPage">-</span>
+        </div>
+        <div class="status-item">
+            <span>标:</span>
+            <span id="statusAnnotations">0</span>
+        </div>
+        <div class="status-item">
+            <span>缩放:</span>
+            <span id="statusZoom">100%</span>
+        </div>
+    </footer>
+
+    <!-- 新建项目模态框 -->
+    <div class="modal-overlay" id="projectModal">
+        <div class="modal" style="width: 450px;">
+            <div class="modal-header">
+                <h2 class="modal-title">新建项目</h2>
+                <button class="modal-close" onclick="closeModal('projectModal')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">古籍标题 *</label>
+                    <input type="text" class="form-input" id="projectTitle" placeholder="请输入古籍标题">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">作者</label>
+                        <input type="text" class="form-input" id="projectAuthor" placeholder="作者">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">朝代</label>
+                        <input type="text" class="form-input" id="projectDynasty" placeholder="如：唐">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">书籍</label>
+                        <input type="text" class="form-input" id="projectBook" placeholder="书籍名">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">卷/期</label>
+                        <input type="text" class="form-input" id="projectVolume" placeholder="如：卷一">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('projectModal')">取消</button>
+                <button class="btn btn-primary" onclick="confirmNewProject()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" id="importImageInput" class="hidden-input" accept="image/*" multiple
+        onchange="handleImageImport(event)">
+    <input type="file" id="openProjectInput" class="hidden-input" accept=".json,.sdocproj"
+        onchange="handleProjectOpen(event)">
+
+    <script src="js/common.js"></script>
+    <script>
+        // ===== 编辑页状态 =====
+        let mainCanvas, annotationCanvas, interactionCanvas;
+        let mainCtx, annotationCtx, interactionCtx;
+        let selectedAnnotation = null;
+        let currentTool = 'select';
+        let currentColor = '#C84A32';
+        let currentMarkType = 'box';
+        let currentAttrType = '字';  // 属性类型：字/词/句子
+        let zoom = 1;
+        let isDrawing = false;
+        let startX, startY;
+        let currentRect = null;
+        let slashStartX, slashStartY;  // 斜线绘制起点
+        let undoStack = [];
+        let redoStack = [];
+
+        // ===== 初始化 =====
+        function init() {
+            mainCanvas = document.getElementById('mainCanvas');
+            annotationCanvas = document.getElementById('annotationLayer');
+            interactionCanvas = document.getElementById('interactionLayer');
+
+            if (mainCanvas && annotationCanvas && interactionCanvas) {
+                mainCtx = mainCanvas.getContext('2d');
+                annotationCtx = annotationCanvas.getContext('2d');
+                interactionCtx = interactionCanvas.getContext('2d');
+
+                setupEventListeners();
+                updateUI();
+            }
+        }
+
+        // ===== 事件监听 =====
+        function setupEventListeners() {
+            interactionCanvas.addEventListener('mousedown', handleCanvasMouseDown);
+            interactionCanvas.addEventListener('mousemove', handleCanvasMouseMove);
+            interactionCanvas.addEventListener('mouseup', handleCanvasMouseUp);
+            interactionCanvas.addEventListener('mouseleave', handleCanvasMouseUp);
+
+            document.getElementById('canvasContainer').addEventListener('wheel', handleWheelZoom);
+        }
+
+        // ===== 工具选择 =====
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn[id$="Tool"]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tool + 'Tool')?.classList.add('active');
+            interactionCanvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+
+            // 显示/隐藏属性类型选择器
+            const attrTypeContainer = document.getElementById('attrTypeContainer');
+            if (tool === 'box') {
+                attrTypeContainer.style.display = 'block';
+            } else {
+                attrTypeContainer.style.display = 'none';
+            }
+        }
+
+        // ===== 属性类型选择 =====
+        function selectAttrType(btn) {
+            document.querySelectorAll('.attr-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentAttrType = btn.dataset.type;
+
+            // 根据属性类型自动设置颜色
+            const colorMap = {
+                '字': '#C84A32',    // --mark-red
+                '词': '#2B5F8E',    // --mark-blue
+                '句子': '#5B8C5A'   // --mark-green
+            };
+            currentColor = colorMap[currentAttrType];
+
+            // 更新颜色选择器显示
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.remove('selected');
+                if (s.dataset.color === currentColor) {
+                    s.classList.add('selected');
+                }
+            });
+
+            // 如果当前有选中的框选标注，更新其颜色和属性类型
+            if (selectedAnnotation && selectedAnnotation.type === 'box') {
+                selectedAnnotation.color = currentColor;
+                selectedAnnotation.attrType = currentAttrType;
+                redrawAnnotations();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        // ===== 颜色选择 =====
+        function selectColor(el) {
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            el.classList.add('selected');
+            currentColor = el.dataset.color;
+
+            // 取消属性类型按钮的激活状态（因为用户手动选择了颜色）
+            if (currentMarkType === 'box') {
+                document.querySelectorAll('.attr-type-btn').forEach(b => b.classList.remove('active'));
+            }
+
+            if (selectedAnnotation) {
+                selectedAnnotation.color = currentColor;
+                redrawAnnotations();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        // ===== 标注类型选择 =====
+        function selectMarkType(btn) {
+            document.querySelectorAll('.mark-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMarkType = btn.dataset.type;
+
+            // 显示/隐藏属性类型选择器
+            const attrTypeContainer = document.getElementById('attrTypeContainer');
+            if (currentMarkType === 'box') {
+                attrTypeContainer.style.display = 'block';
+            } else {
+                attrTypeContainer.style.display = 'none';
+            }
+
+            if (selectedAnnotation) {
+                selectedAnnotation.type = currentMarkType;
+                redrawAnnotations();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        // ===== 画布操作 =====
+        function handleCanvasMouseDown(e) {
+            if (!AppState.pages.length) return;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
+
+            if (currentTool === 'select') {
+                const clicked = findAnnotationAt(x, y);
+                if (clicked) {
+                    selectAnnotation(clicked);
+                } else {
+                    deselectAnnotation();
+                }
+            } else if (currentTool === 'slash') {
+                // 斜线绘制
+                isDrawing = true;
+                slashStartX = x;
+                slashStartY = y;
+            } else {
+                isDrawing = true;
+                startX = x;
+                startY = y;
+                currentRect = { x, y, width: 0, height: 0 };
+            }
+        }
+
+        function handleCanvasMouseMove(e) {
+            if (!isDrawing) return;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
+
+            if (currentTool === 'slash') {
+                // 绘制斜线预览
+                clearInteractionCanvas();
+                interactionCtx.strokeStyle = '#E0E0E0';
+                interactionCtx.lineWidth = 1;
+                interactionCtx.setLineDash([5, 5]);
+                interactionCtx.beginPath();
+                interactionCtx.moveTo(slashStartX, slashStartY);
+                interactionCtx.lineTo(x, y);
+                interactionCtx.stroke();
+                interactionCtx.setLineDash([]);
+            } else {
+                currentRect.width = x - startX;
+                currentRect.height = y - startY;
+                drawCurrentRect();
+            }
+        }
+
+        function handleCanvasMouseUp(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
+
+            if (currentTool === 'slash') {
+                // 创建斜线标注
+                const distance = Math.sqrt(Math.pow(x - slashStartX, 2) + Math.pow(y - slashStartY, 2));
+                if (distance > 10) {
+                    createSlashAnnotation(slashStartX, slashStartY, x, y);
+                }
+            } else if (currentRect && Math.abs(currentRect.width) > 5 && Math.abs(currentRect.height) > 5) {
+                const normalizedRect = {
+                    x: currentRect.width > 0 ? currentRect.x : currentRect.x + currentRect.width,
+                    y: currentRect.height > 0 ? currentRect.y : currentRect.y + currentRect.height,
+                    width: Math.abs(currentRect.width),
+                    height: Math.abs(currentRect.height)
+                };
+
+                createAnnotation(normalizedRect);
+            }
+
+            clearInteractionCanvas();
+            currentRect = null;
+        }
+
+        function drawCurrentRect() {
+            clearInteractionCanvas();
+            if (!currentRect) return;
+
+            interactionCtx.strokeStyle = currentColor;
+            interactionCtx.lineWidth = 2;
+            interactionCtx.setLineDash([5, 5]);
+            interactionCtx.strokeRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
+            interactionCtx.setLineDash([]);
+        }
+
+        function clearInteractionCanvas() {
+            interactionCtx.clearRect(0, 0, interactionCanvas.width, interactionCanvas.height);
+        }
+
+        // ===== 标注操作 =====
+        function createAnnotation(rect) {
+            saveUndoState();
+
+            const annotation = {
+                id: 'ann_' + Date.now(),
+                pageId: AppState.pages[AppState.currentPageIndex]?.id,
+                type: currentMarkType,
+                rect: rect,
+                color: currentColor,
+                simplifiedChar: '',
+                note: '',
+                attrType: currentMarkType === 'box' ? currentAttrType : null
+            };
+
+            AppState.annotations.push(annotation);
+            selectedAnnotation = annotation;
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function createSlashAnnotation(x1, y1, x2, y2) {
+            saveUndoState();
+
+            const annotation = {
+                id: 'ann_' + Date.now(),
+                pageId: AppState.pages[AppState.currentPageIndex]?.id,
+                type: 'slash',
+                x1: x1,
+                y1: y1,
+                x2: x2,
+                y2: y2,
+                color: '#E0E0E0',
+                simplifiedChar: '',
+                note: ''
+            };
+
+            AppState.annotations.push(annotation);
+            selectedAnnotation = annotation;
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function selectAnnotation(annotation) {
+            selectedAnnotation = annotation;
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+        }
+
+        function deselectAnnotation() {
+            selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            clearPropertyPanel();
+        }
+
+        function deleteAnnotation(id) {
+            saveUndoState();
+            AppState.annotations = AppState.annotations.filter(a => a.id !== id);
+            if (selectedAnnotation?.id === id) {
+                selectedAnnotation = null;
+            }
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function findAnnotationAt(x, y) {
+            for (let i = AppState.annotations.length - 1; i >= 0; i--) {
+                const ann = AppState.annotations[i];
+                if (ann.pageId !== AppState.pages[AppState.currentPageIndex]?.id) continue;
+
+                if (ann.type === 'slash') {
+                    // 斜线检测（简化为矩形检测）
+                    const minX = Math.min(ann.x1, ann.x2);
+                    const maxX = Math.max(ann.x1, ann.x2);
+                    const minY = Math.min(ann.y1, ann.y2);
+                    const maxY = Math.max(ann.y1, ann.y2);
+                    const padding = 5;
+                    if (x >= minX - padding && x <= maxX + padding && y >= minY - padding && y <= maxY + padding) {
+                        return ann;
+                    }
+                } else if (ann.rect) {
+                    if (x >= ann.rect.x && x <= ann.rect.x + ann.rect.width &&
+                        y >= ann.rect.y && y <= ann.rect.y + ann.rect.height) {
+                        return ann;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function redrawAnnotations() {
+            annotationCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+
+            AppState.annotations.forEach(ann => {
+                if (ann.pageId !== AppState.pages[AppState.currentPageIndex]?.id) return;
+
+                const isSelected = selectedAnnotation?.id === ann.id;
+                annotationCtx.strokeStyle = ann.color;
+                annotationCtx.fillStyle = ann.color;
+
+                switch (ann.type) {
+                    case 'box':
+                        annotationCtx.lineWidth = isSelected ? 3 : 2;
+                        annotationCtx.strokeRect(ann.rect.x, ann.rect.y, ann.rect.width, ann.rect.height);
+                        break;
+                    case 'underline':
+                        annotationCtx.lineWidth = isSelected ? 4 : 3;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.rect.x, ann.rect.y + ann.rect.height);
+                        annotationCtx.lineTo(ann.rect.x + ann.rect.width, ann.rect.y + ann.rect.height);
+                        annotationCtx.stroke();
+                        break;
+                    case 'highlight':
+                        annotationCtx.globalAlpha = 0.3;
+                        annotationCtx.fillRect(ann.rect.x, ann.rect.y, ann.rect.width, ann.rect.height);
+                        annotationCtx.globalAlpha = 1;
+                        break;
+                    case 'strikethrough':
+                        annotationCtx.lineWidth = isSelected ? 4 : 3;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.rect.x, ann.rect.y + ann.rect.height / 2);
+                        annotationCtx.lineTo(ann.rect.x + ann.rect.width, ann.rect.y + ann.rect.height / 2);
+                        annotationCtx.stroke();
+                        break;
+                    case 'slash':
+                        annotationCtx.lineWidth = isSelected ? 2 : 1;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.x1, ann.y1);
+                        annotationCtx.lineTo(ann.x2, ann.y2);
+                        annotationCtx.stroke();
+                        break;
+                }
+            });
+        }
+
+        // ===== 属性面板 =====
+        function updatePropertyPanel() {
+            if (!selectedAnnotation) {
+                clearPropertyPanel();
+                return;
+            }
+
+            document.getElementById('simplifiedCharInput').value = selectedAnnotation.simplifiedChar || '';
+            document.getElementById('annotationNoteInput').value = selectedAnnotation.note || '';
+
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.remove('selected');
+                if (s.dataset.color === selectedAnnotation.color) {
+                    s.classList.add('selected');
+                }
+            });
+
+            document.querySelectorAll('.mark-type-btn').forEach(b => {
+                b.classList.remove('active');
+                if (b.dataset.type === selectedAnnotation.type) {
+                    b.classList.add('active');
+                }
+            });
+
+            // 更新属性类型选择器
+            const attrTypeContainer = document.getElementById('attrTypeContainer');
+            if (selectedAnnotation.type === 'box') {
+                attrTypeContainer.style.display = 'block';
+                document.querySelectorAll('.attr-type-btn').forEach(b => {
+                    b.classList.remove('active');
+                    if (b.dataset.type === selectedAnnotation.attrType) {
+                        b.classList.add('active');
+                    }
+                });
+            } else {
+                attrTypeContainer.style.display = 'none';
+            }
+        }
+
+        function clearPropertyPanel() {
+            document.getElementById('simplifiedCharInput').value = '';
+            document.getElementById('annotationNoteInput').value = '';
+            document.getElementById('attrTypeContainer').style.display = currentMarkType === 'box' ? 'block' : 'none';
+        }
+
+        function updateAnnotationSimplified(value) {
+            if (selectedAnnotation) {
+                selectedAnnotation.simplifiedChar = value;
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        function updateAnnotationNote(value) {
+            if (selectedAnnotation) {
+                selectedAnnotation.note = value;
+                markAsModified();
+            }
+        }
+
+        // ===== 标注列表 =====
+        function updateAnnotationList() {
+            const container = document.getElementById('annotationList');
+            const pageAnnotations = AppState.annotations.filter(a =>
+                a.pageId === AppState.pages[AppState.currentPageIndex]?.id
+            );
+
+            document.getElementById('annotationCount').textContent = pageAnnotations.length + '条';
+
+            if (pageAnnotations.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--color-text-light); font-size: 12px;">暂无标注</div>';
+                return;
+            }
+
+            container.innerHTML = pageAnnotations.map(ann => {
+                const typeName = ann.type === 'slash' ? '斜线' : getMarkTypeName(ann.type);
+                const attrInfo = ann.attrType ? ` <span style="color:${ann.color};">(${ann.attrType})</span>` : '';
+                let displayChar;
+                if (ann.attrType === '句子') {
+                    displayChar = '句';
+                }
+                else if (ann.attrType === '词') {
+                    displayChar = '词';
+                }
+                else {
+                    displayChar = ann.simplifiedChar || (ann.type === 'slash' ? '/' : '?');
+                }
+                return `
+                    <div class="annotation-card ${selectedAnnotation?.id === ann.id ? 'selected' : ''}" onclick="selectAnnotationById('${ann.id}')">
+                        <div class="annotation-preview">
+                            <div class="annotation-char" style="border-left: 3px solid ${ann.color};">${displayChar}</div>
+                            <div class="annotation-info">
+                                <div class="annotation-simplified">${ann.simplifiedChar || '（未填）'}${attrInfo}</div>
+                                <div class="annotation-type">${typeName}</div>
+                            </div>
+                        </div>
+                        <div class="annotation-actions">
+                            <button class="annotation-action-btn" onclick="event.stopPropagation(); selectAnnotationById('${ann.id}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                            <button class="annotation-action-btn delete" onclick="event.stopPropagation(); deleteAnnotation('${ann.id}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectAnnotationById(id) {
+            const ann = AppState.annotations.find(a => a.id === id);
+            if (ann) selectAnnotation(ann);
+        }
+
+        // ===== 页面管理 =====
+        function handleImageImport(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+
+            if (!AppState.project) {
+                openModal('projectModal');
+            }
+
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        addPage({
+                            id: 'page_' + Date.now() + '_' + index,
+                            pageNo: AppState.pages.length + 1,
+                            imageSrc: e.target.result,
+                            width: img.width,
+                            height: img.height
+                        });
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            event.target.value = '';
+        }
+
+        function addPage(page) {
+            AppState.pages.push(page);
+            AppState.save();
+            updateThumbnailList();
+
+            if (AppState.pages.length === 1) {
+                loadPage(0);
+            }
+
+            updatePageNavButtons();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function loadPage(index) {
+            if (index < 0 || index >= AppState.pages.length) return;
+
+            AppState.currentPageIndex = index;
+            const page = AppState.pages[index];
+
+            mainCanvas.width = page.width;
+            mainCanvas.height = page.height;
+            annotationCanvas.width = page.width;
+            annotationCanvas.height = page.height;
+            interactionCanvas.width = page.width;
+            interactionCanvas.height = page.height;
+
+            const img = new Image();
+            img.onload = () => {
+                mainCtx.drawImage(img, 0, 0);
+                hideEmptyState();
+                redrawAnnotations();
+                updateAnnotationList();
+            };
+            img.src = page.imageSrc;
+
+            updatePageIndicator();
+            updateThumbnailList();
+            updatePageNavButtons();
+            updateStatusBar();
+        }
+
+        function updateThumbnailList() {
+            const container = document.getElementById('thumbnailList');
+
+            if (AppState.pages.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--color-text-light); font-size: 11px;">暂无页面</div>';
+                return;
+            }
+
+            container.innerHTML = AppState.pages.map((page, index) => `
+                <div class="thumbnail-item ${index === AppState.currentPageIndex ? 'active' : ''}" onclick="loadPage(${index})">
+                    <img src="${page.imageSrc}" alt="Page ${index + 1}">
+                    <span class="thumbnail-page">${index + 1}</span>
+                    <button class="thumbnail-delete" onclick="event.stopPropagation(); deletePage(${index})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function deletePage(index) {
+            if (AppState.pages.length <= 1) {
+                AppState.pages = [];
+                AppState.annotations = [];
+                AppState.currentPageIndex = 0;
+                AppState.save();
+                showEmptyState();
+                clearCanvases();
+            } else {
+                const pageId = AppState.pages[index].id;
+                AppState.annotations = AppState.annotations.filter(a => a.pageId !== pageId);
+                AppState.pages.splice(index, 1);
+                AppState.pages.forEach((p, i) => p.pageNo = i + 1);
+
+                if (AppState.currentPageIndex >= AppState.pages.length) {
+                    AppState.currentPageIndex = AppState.pages.length - 1;
+                }
+                AppState.save();
+                loadPage(AppState.currentPageIndex);
+            }
+
+            updateThumbnailList();
+            updatePageNavButtons();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function goToFirstPage() { loadPage(0); }
+        function goToPrevPage() { loadPage(AppState.currentPageIndex - 1); }
+        function goToNextPage() { loadPage(AppState.currentPageIndex + 1); }
+        function goToLastPage() { loadPage(AppState.pages.length - 1); }
+
+        function updatePageNavButtons() {
+            const btns = document.querySelectorAll('.page-nav-btn');
+            if (btns.length >= 4) {
+                btns[0].disabled = AppState.currentPageIndex <= 0;
+                btns[1].disabled = AppState.currentPageIndex <= 0;
+                btns[2].disabled = AppState.currentPageIndex >= AppState.pages.length - 1;
+                btns[3].disabled = AppState.currentPageIndex >= AppState.pages.length - 1;
+            }
+        }
+
+        function updatePageIndicator() {
+            document.getElementById('pageIndicator').textContent =
+                `${AppState.currentPageIndex + 1} / ${Math.max(1, AppState.pages.length)}`;
+        }
+
+        // ===== 缩放 =====
+        function zoomIn() {
+            zoom = Math.min(4, zoom + 0.25);
+            applyZoom();
+        }
+
+        function zoomOut() {
+            zoom = Math.max(0.25, zoom - 0.25);
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const wrapper = document.getElementById('canvasWrapper');
+            wrapper.style.transform = `scale(${zoom})`;
+            document.getElementById('zoomValue').textContent = Math.round(zoom * 100) + '%';
+            document.getElementById('statusZoom').textContent = Math.round(zoom * 100) + '%';
+        }
+
+        function handleWheelZoom(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                if (e.deltaY < 0) zoomIn();
+                else zoomOut();
+            }
+        }
+
+        // ===== 项目管理 =====
+
+        function createNewProject() {
+            openModal('projectModal');
+        }
+
+        function isProjectInfoComplete() {
+            return AppState.project &&
+                AppState.project.title &&
+                AppState.project.author &&
+                AppState.project.dynasty &&
+                AppState.project.book &&
+                AppState.project.volume;
+        }
+
+        function confirmNewProject() {
+            const title = document.getElementById('projectTitle').value.trim();
+            if (!title) {
+                alert('请输入古籍标题');
+                return;
+            }
+
+            AppState.project = {
+                id: 'proj_' + Date.now(),
+                title: title,
+                author: document.getElementById('projectAuthor').value,
+                dynasty: document.getElementById('projectDynasty').value,
+                book: document.getElementById('projectBook').value,
+                volume: document.getElementById('projectVolume').value
+            };
+
+            AppState.save();
+            closeModal('projectModal');
+            setStatus('项目已创建');
+        }
+
+        function handleProjectOpen(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            ProjectManager.import(file).then(() => {
+                updateUI();
+                if (AppState.pages.length > 0) {
+                    loadPage(0);
+                }
+            }).catch(err => {
+                alert(err.message);
+            });
+
+            event.target.value = '';
+        }
+
+        function saveProject() {
+            // 1. 检查 AppState 数据是否完整
+            if (!isProjectInfoComplete()) {
+                alert('请先完善并确认项目基本信息（标题、作者、朝代等）');
+                createNewProject(); // 自动打开弹窗
+                return; // 中止程序，不执行后面的 AppState.save()
+            }
+
+            // 2. 若信息完整，执行原有程序
+            AppState.save();
+            ProjectManager.export();
+            setStatus('项目已保存', 'saved');
+        }
+
+        function handleExportXML() {
+            //检查信息是否已经填写完整
+            if (isProjectInfoComplete()) {
+                // 如果信息已输入，按原计划跳转到导出页面
+                window.location.href = 'exportXml.html';
+            } else {
+                // 如果信息不完整，提示并自动打开“新建”弹窗
+                alert('请先完善项目基本信息（标题、作者、朝代等）');
+                createNewProject();
+            }
+        }
+
+
+        // ===== 撤销/重做 =====
+        function saveUndoState() {
+            undoStack.push(JSON.stringify(AppState.annotations));
+            redoStack = [];
+        }
+
+        function undoAction() {
+            if (undoStack.length === 0) return;
+            redoStack.push(JSON.stringify(AppState.annotations));
+            AppState.annotations = JSON.parse(undoStack.pop());
+            selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            markAsModified();
+        }
+
+        function redoAction() {
+            if (redoStack.length === 0) return;
+            undoStack.push(JSON.stringify(AppState.annotations));
+            AppState.annotations = JSON.parse(redoStack.pop());
+            selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            markAsModified();
+        }
+
+        // ===== UI更新 =====
+        function updateUI() {
+            updateThumbnailList();
+            updatePageNavButtons();
+            updatePageIndicator();
+            updateAnnotationList();
+            updateCustomCharsGrid();
+            updateStatusBar();
+
+            if (AppState.pages.length > 0) {
+                loadPage(AppState.currentPageIndex);
+            } else {
+                showEmptyState();
+            }
+        }
+
+        function updateStatusBar() {
+            document.getElementById('statusPage').textContent =
+                AppState.pages.length > 0 ? `${AppState.currentPageIndex + 1}/${AppState.pages.length}` : '-';
+            document.getElementById('statusAnnotations').textContent = AppState.annotations.length;
+        }
+
+        function updateCustomCharsGrid() {
+            const container = document.getElementById('customCharsGrid');
+            document.getElementById('customCharCount').textContent = AppState.customChars.length + '个';
+
+            if (AppState.customChars.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 12px; color: var(--color-text-light); font-size: 11px;">暂无造字</div>';
+                return;
+            }
+
+            container.innerHTML = AppState.customChars.map(char => `
+                <div class="custom-char-item" onclick="useCustomChar('${char.id}')" title="${char.name}">
+                    <img src="${char.imageData}" alt="${char.name}">
+                </div>
+            `).join('');
+        }
+
+        function useCustomChar(charId) {
+            const char = AppState.customChars.find(c => c.id === charId);
+            if (char && selectedAnnotation) {
+                selectedAnnotation.simplifiedChar = char.name;
+                updatePropertyPanel();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        function markAsModified() {
+            AppState.save();
+            document.getElementById('statusDot').classList.add('modified');
+            document.getElementById('statusText').textContent = '已修改';
+        }
+
+        function setStatus(text, type) {
+            document.getElementById('statusText').textContent = text;
+            if (type === 'saved') {
+                document.getElementById('statusDot').classList.remove('modified');
+            }
+        }
+
+        function showEmptyState() {
+            document.getElementById('emptyState').style.display = 'flex';
+            document.getElementById('canvasWrapper').style.display = 'none';
+        }
+
+        function hideEmptyState() {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('canvasWrapper').style.display = 'block';
+        }
+
+        function clearCanvases() {
+            if (mainCtx) mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            if (annotationCtx) annotationCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+            if (interactionCtx) interactionCtx.clearRect(0, 0, interactionCanvas.width, interactionCanvas.height);
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', init);
+
+        <!--附加内容-->
+        function checkProjectInfoComplete() {
+            if (!AppState.project ||
+                !AppState.project.title ||
+                !AppState.project.author ||
+                !AppState.project.dynasty) {
+                return false;
+            }
+            return true;
+        }
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .inland-security-footer {
+            position: fixed;
+            z-index: 10;
+            bottom: 0;
+            right: 0;
+            width: fit-content;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .tooltip-container {
+            position: relative;
+        }
+
+        .trigger-content {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            background-color: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .minimax-link {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 300;
+            color: #adadad;
+            text-decoration: none;
+        }
+
+        .minimax-link:visited {
+            color: #adadad;
+        }
+
+        .minimax-link:hover {
+            color: #666666;
+        }
+
+        .tooltip-content {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            padding-bottom: 16px;
+            /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+            font-size: 12px;
+            line-height: 17px;
+            background-color: #fafafa;
+            border-radius: 12px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            color: #171717;
+        }
+
+        /* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            right: 0;
+            height: 16px;
+        }
+
+        .tooltip-container:hover .tooltip-content {
+            display: flex;
+        }
+
+        .info-section {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .beian-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: #171717;
+        }
+
+        .beian-icon {
+            width: 14px;
+            height: 14px;
+            margin-right: 2px;
+        }
+
+        .underline-text {
+            color: #171717;
+            text-decoration: underline;
+        }
+
+        .underline-text:hover {
+            color: #000000;
+        }
+
+        /* 深色模式支持 */
+        @media (prefers-color-scheme: dark) {
+            .trigger-content {
+                background-color: transparent;
+            }
+
+            .minimax-link,
+            .minimax-link:visited {
+                color: #666666;
+            }
+
+            .minimax-link:hover {
+                color: #adadad;
+            }
+
+            .tooltip-content {
+                background-color: #262626;
+                color: #ededed;
+            }
+
+            .beian-link,
+            .underline-text {
+                color: #ededed;
+            }
+
+            .underline-text:hover {
+                color: #ffffff;
+            }
+        }
+    </style>
+    <div class="inland-security-footer">
+        <div class="tooltip-container">
+            <div class="trigger-content">
+                <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+                    <span>© 2026 MiniMax</span>
+                </a>
+            </div>
+            <div class="tooltip-content">
+                <section class="info-section">
+                    <span>上海稀宇科技有限公司</span>
+                </section>
+
+                <section class="info-section">
+                    <a class="beian-link"
+                        href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179"
+                        target="_blank" rel="noreferrer">
+                        <img alt="hailuo-beian-icon"
+                            src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png"
+                            class="beian-icon">
+                        <span class="underline-text">沪公网安备31010402010179号</span>
+                    </a>
+                    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+                        沪ICP备2023003282号-38
+                    </a>
+                </section>
+
+                <section class="info-section">
+                    <span>模型名称：MiniMax</span>
+                    <span>备案号：Shanghai-MiniMax-202505230046</span>
+                </section>
+
+                <section class="info-section">
+                    <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer"
+                        class="underline-text">
+                        用户协议
+                    </a>
+                    <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer"
+                        class="underline-text">
+                        隐私政策
+                    </a>
+                </section>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

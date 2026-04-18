@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>申请加入项目 | SDOC Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/surface-pages.css">
+</head>
+
+<body>
+  <header class="top-nav">
+    <a href="index.html" class="nav-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span>古籍编辑器</span>
+    </a>
+    <nav class="nav-links nav-breadcrumb" aria-label="面包屑">
+      <a href="index.html" class="nav-link">首页</a>
+      <span class="nav-breadcrumb-sep" aria-hidden="true">&gt;</span>
+      <a href="project.html" class="nav-link">项目</a>
+      <span class="nav-breadcrumb-sep" aria-hidden="true">&gt;</span>
+      <a href="project-members.html" id="navBreadcrumbMembers" class="nav-link">成员管理</a>
+      <span class="nav-breadcrumb-sep" aria-hidden="true">&gt;</span>
+      <span class="nav-breadcrumb-current">申请加入</span>
+    </nav>
+    <div class="nav-spacer"></div>
+  </header>
+
+  <main class="page-container surface-scroll">
+    <div class="surface-page-wrap">
+      <div class="surface-inner surface-inner--narrow">
+        <div class="surface-page-header">
+          <h1 class="surface-page-title">申请加入项目</h1>
+          <p class="surface-page-desc">提交申请后，由项目管理员审批</p>
+        </div>
+
+        <div class="surface-tips">
+          <div class="surface-tips-title">说明</div>
+          <p class="surface-muted" style="font-size:12px;line-height:1.6;margin:0;">请填写申请理由，审批结果将通知您（以站内流程为准）。</p>
+        </div>
+
+        <div class="surface-card">
+          <div class="surface-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+              <line x1="7" y1="8" x2="17" y2="8"></line>
+            </svg>
+            项目信息
+          </div>
+          <div id="info" class="surface-muted" style="margin-bottom:var(--space-md);"></div>
+
+          <form id="form">
+            <div class="surface-form-group">
+              <label for="requested-role">申请角色</label>
+              <select id="requested-role" class="surface-select">
+                <option value="viewer">只读</option>
+                <option value="editor">可编辑</option>
+              </select>
+            </div>
+            <div class="surface-form-group">
+              <label for="request-message">申请理由</label>
+              <textarea id="request-message" class="surface-textarea" rows="5" required placeholder="请简要说明"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">提交申请</button>
+          </form>
+        </div>
+
+        <!-- <p style="margin-top:var(--space-md);">
+          <a href="project-members.html" id="linkBackMembers" class="surface-link">← 返回上一级</a>
+        </p> -->
+      </div>
+    </div>
+  </main>
+
+  <footer class="statusbar">
+    <div class="status-item"><span>申请加入</span></div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    const API_BASE = window.SDOC_API_BASE || 'http://localhost:8000';
+    const pid = new URLSearchParams(location.search).get('id') || '';
+
+    function applyProjectMembersLinks() {
+      const membersUrl = pid
+        ? ('project-members.html?id=' + encodeURIComponent(pid))
+        : 'project.html';
+      const nav = document.getElementById('navBreadcrumbMembers');
+      const back = document.getElementById('linkBackMembers');
+      if (nav) nav.href = membersUrl;
+      if (back) back.href = membersUrl;
+    }
+
+    async function loadInfo() {
+      if (!pid) { alert('缺少项目'); return; }
+      const resp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(pid) + '/join-info');
+      if (!resp.ok) { document.getElementById('info').textContent = '无法加载项目或不允许申请'; return; }
+      const d = await resp.json();
+      document.getElementById('info').innerHTML =
+        '<p style="font-family:\'Noto Serif SC\',serif;font-size:16px;font-weight:600;color:var(--color-ink);">' + (d.projectName || '') + '</p>' +
+        '<p style="margin-top:8px;">创建者：' + (d.ownerName || '') + '</p>';
+    }
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!Auth.isLoggedIn()) { location.href = 'login.html'; return; }
+      const body = {
+        requestedRole: document.getElementById('requested-role').value,
+        message: document.getElementById('request-message').value.trim()
+      };
+      const resp = await fetch(API_BASE + '/api/projects/' + encodeURIComponent(pid) + '/join-requests', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, Auth.getAuthHeaders()),
+        body: JSON.stringify(body)
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) { alert(data.error || '提交失败'); return; }
+      alert('申请已提交');
+      location.href = 'project.html';
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      applyProjectMembersLinks();
+      loadInfo();
+    });
+  </script>
+</body>
+
+</html>

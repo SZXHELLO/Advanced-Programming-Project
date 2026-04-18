@@ -1,0 +1,3292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>古籍在线编辑器 | SDOC Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 主色调 */
+            --color-ink: #2C2C2C;
+            --color-paper: #F5F0E8;
+            --color-cinnabar: #C84A32;
+            --color-azurite: #2B5F8E;
+            --color-bamboo: #5B8C5A;
+            --color-border: #D4C5B0;
+            --color-text: #3D3D3D;
+            --color-text-light: #7A7A7A;
+
+            /* 标注颜色 */
+            --mark-red: #C84A32;
+            --mark-blue: #2B5F8E;
+            --mark-green: #5B8C5A;
+            --mark-yellow: #E8C547;
+            --mark-purple: #7B5BA6;
+            --mark-orange: #D67B3C;
+
+            /* 间距 */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+            --space-xxl: 48px;
+
+            /* 阴影 */
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.15);
+
+            /* 圆角 */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+
+            /* 动画 */
+            --transition-fast: 150ms ease-out;
+            --transition-normal: 300ms ease-out;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-paper);
+            color: var(--color-text);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 宣纸纹理背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ===== 顶部工具栏 ===== */
+        .toolbar {
+            height: 56px;
+            background: linear-gradient(180deg, #3D3D3D 0%, #2C2C2C 100%);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-md);
+            gap: var(--space-md);
+            box-shadow: var(--shadow-md);
+            position: relative;
+            z-index: 100;
+        }
+
+        .toolbar-logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            color: var(--color-paper);
+            font-family: 'Noto Serif SC', serif;
+            font-size: 18px;
+            font-weight: 600;
+            padding-right: var(--space-md);
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .toolbar-logo svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .toolbar-nav {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .toolbar-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.85);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .toolbar-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .toolbar-btn:active {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .toolbar-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .toolbar-spacer {
+            flex: 1;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
+        .btn-primary {
+            background: var(--color-cinnabar);
+            color: white;
+            border: none;
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .btn-primary:hover {
+            background: #B03D28;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        /* ===== 主布局 ===== */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 56px - 32px);
+        }
+
+        /* ===== 左侧面板 ===== */
+        .left-panel {
+            width: 280px;
+            background: #fff;
+            border-right: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-section {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .panel-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-md);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .panel-title svg {
+            width: 16px;
+            height: 16px;
+            color: var(--color-cinnabar);
+        }
+
+        .project-actions {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .project-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .project-btn:hover {
+            background: #EDE8E0;
+            border-color: var(--color-azurite);
+        }
+
+        .project-btn svg {
+            width: 16px;
+            height: 16px;
+            color: var(--color-azurite);
+        }
+
+        .thumbnail-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-sm);
+        }
+
+        .thumbnail-item {
+            position: relative;
+            margin-bottom: var(--space-sm);
+            border: 2px solid transparent;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .thumbnail-item:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .thumbnail-item.active {
+            border-color: var(--color-cinnabar);
+            box-shadow: 0 0 0 2px rgba(200, 74, 50, 0.2);
+        }
+
+        .thumbnail-item img {
+            width: 100%;
+            display: block;
+        }
+
+        .thumbnail-page {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 2px;
+        }
+
+        .thumbnail-delete {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(200, 74, 50, 0.9);
+            color: white;
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .thumbnail-item:hover .thumbnail-delete {
+            opacity: 1;
+        }
+
+        /* ===== 主编辑区域 ===== */
+        .editor-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #E8E4DC;
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            background: #fff;
+            padding: var(--space-sm) var(--space-md);
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .tool-group {
+            display: flex;
+            gap: var(--space-xs);
+            padding-right: var(--space-md);
+            border-right: 1px solid var(--color-border);
+        }
+
+        .tool-group:last-child {
+            border-right: none;
+        }
+
+        .tool-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+        }
+
+        .tool-btn:hover {
+            background: var(--color-paper);
+            border-color: var(--color-border);
+        }
+
+        .tool-btn.active {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .tool-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            margin-left: auto;
+        }
+
+        .zoom-value {
+            font-size: 13px;
+            color: var(--color-text-light);
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .page-nav {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .page-nav-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+        }
+
+        .page-nav-btn:hover:not(:disabled) {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .page-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-nav-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .page-indicator {
+            font-size: 13px;
+            color: var(--color-text);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* 编辑画布容器 */
+        .canvas-container {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-xl);
+            position: relative;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            background: #fff;
+            box-shadow: var(--shadow-lg);
+            transform-origin: center center;
+        }
+
+        #mainCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #annotationLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        #interactionLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-xxl);
+            text-align: center;
+            color: var(--color-text-light);
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: var(--space-lg);
+            opacity: 0.4;
+        }
+
+        .empty-state h3 {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--color-ink);
+            margin-bottom: var(--space-sm);
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            margin-bottom: var(--space-lg);
+        }
+
+        /* ===== 右侧面板 ===== */
+        .right-panel {
+            width: 320px;
+            background: #fff;
+            border-left: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .property-section {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .property-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-md);
+        }
+
+        .property-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-ink);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .property-title svg {
+            width: 16px;
+            height: 16px;
+            color: var(--color-cinnabar);
+        }
+
+        .form-group {
+            margin-bottom: var(--space-md);
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            color: var(--color-text-light);
+            margin-bottom: var(--space-xs);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--space-sm) var(--space-md);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all var(--transition-fast);
+            background: #fff;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--color-azurite);
+            box-shadow: 0 0 0 3px rgba(43, 95, 142, 0.1);
+        }
+
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .color-picker-group {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .color-swatch {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+
+        .color-swatch.selected {
+            border-color: var(--color-ink);
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--color-ink);
+        }
+
+        .mark-type-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .mark-type-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-xs);
+            padding: var(--space-sm);
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .mark-type-btn:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .mark-type-btn.active {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .mark-type-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* 标注列表 */
+        .annotation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-sm);
+        }
+
+        .annotation-card {
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: var(--space-md);
+            margin-bottom: var(--space-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .annotation-card:hover {
+            border-color: var(--color-azurite);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .annotation-card.selected {
+            border-color: var(--color-cinnabar);
+            background: #FDF8F7;
+        }
+
+        .annotation-preview {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-sm);
+        }
+
+        .annotation-char {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 24px;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .annotation-info {
+            flex: 1;
+        }
+
+        .annotation-simplified {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--color-ink);
+            margin-bottom: 2px;
+        }
+
+        .annotation-type {
+            font-size: 11px;
+            color: var(--color-text-light);
+        }
+
+        .annotation-actions {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .annotation-action-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text-light);
+            transition: all var(--transition-fast);
+        }
+
+        .annotation-action-btn:hover {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .annotation-action-btn.delete:hover {
+            background: var(--color-cinnabar);
+            border-color: var(--color-cinnabar);
+        }
+
+        .annotation-action-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* ===== 底部状态栏 ===== */
+        .statusbar {
+            height: 32px;
+            background: var(--color-ink);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-md);
+            gap: var(--space-lg);
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-bamboo);
+        }
+
+        .status-dot.modified {
+            background: var(--color-cinnabar);
+        }
+
+        /* ===== 模态框 ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-normal);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: #fff;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: hidden;
+            transform: scale(0.9);
+            transition: transform var(--transition-normal);
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: var(--space-lg);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--color-ink);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--color-text-light);
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .modal-close:hover {
+            background: var(--color-paper);
+            color: var(--color-ink);
+        }
+
+        .modal-body {
+            padding: var(--space-lg);
+            overflow-y: auto;
+            max-height: calc(90vh - 140px);
+        }
+
+        .modal-footer {
+            padding: var(--space-md) var(--space-lg);
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-sm);
+        }
+
+        /* 造字模态框 */
+        .char-creation-modal .modal {
+            width: 600px;
+        }
+
+        .char-canvas-area {
+            display: flex;
+            gap: var(--space-lg);
+        }
+
+        .char-canvas-wrapper {
+            flex: 1;
+        }
+
+        .char-canvas-container {
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1;
+        }
+
+        #charCanvas {
+            cursor: crosshair;
+        }
+
+        .char-tools {
+            display: flex;
+            gap: var(--space-sm);
+            margin-top: var(--space-md);
+            justify-content: center;
+        }
+
+        .char-tool-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--color-text);
+            transition: all var(--transition-fast);
+        }
+
+        .char-tool-btn:hover {
+            border-color: var(--color-azurite);
+        }
+
+        .char-tool-btn.active {
+            background: var(--color-azurite);
+            color: white;
+            border-color: var(--color-azurite);
+        }
+
+        .char-tool-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .char-info-panel {
+            width: 180px;
+        }
+
+        .char-preview {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-family: 'Noto Serif SC', serif;
+            margin-bottom: var(--space-md);
+        }
+
+        .unicode-display {
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            padding: var(--space-sm) var(--space-md);
+            background: var(--color-paper);
+            border-radius: var(--radius-sm);
+            text-align: center;
+            margin-bottom: var(--space-md);
+        }
+
+        /* 项目信息模态框 */
+        .project-modal .modal {
+            width: 500px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-md);
+        }
+
+        /* XML预览模态框 */
+        .xml-preview-modal .modal {
+            width: 800px;
+            height: 80vh;
+        }
+
+        .xml-preview-modal .modal-body {
+            padding: 0;
+        }
+
+        .xml-preview-content {
+            height: 100%;
+            overflow: auto;
+            padding: var(--space-lg);
+        }
+
+        .xml-preview-content pre {
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--color-ink);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* 下拉菜单 */
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-md);
+            min-width: 160px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all var(--transition-fast);
+            z-index: 100;
+        }
+
+        .dropdown.active .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(4px);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            color: var(--color-text);
+            font-size: 13px;
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .dropdown-item:hover {
+            background: var(--color-paper);
+        }
+
+        .dropdown-item svg {
+            width: 16px;
+            height: 16px;
+            color: var(--color-text-light);
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--color-border);
+            margin: var(--space-xs) 0;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--color-paper);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #B5A89A;
+        }
+
+        /* 工具提示 */
+        [data-tooltip] {
+            position: relative;
+        }
+
+        [data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: var(--space-xs) var(--space-sm);
+            background: var(--color-ink);
+            color: #fff;
+            font-size: 12px;
+            border-radius: var(--radius-sm);
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-fast);
+            pointer-events: none;
+            margin-bottom: 4px;
+        }
+
+        [data-tooltip]:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* 造字区域样式 */
+        .custom-chars-section {
+            border-top: 1px solid var(--color-border);
+            padding: var(--space-md);
+        }
+
+        .custom-chars-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-xs);
+        }
+
+        .custom-char-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 24px;
+            font-family: 'Noto Serif SC', serif;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .custom-char-item:hover {
+            border-color: var(--color-azurite);
+            background: #fff;
+        }
+
+        /* 隐藏文件输入 */
+        .hidden-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部工具栏 -->
+    <header class="toolbar">
+        <div class="toolbar-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                <line x1="8" y1="6" x2="16" y2="6"></line>
+                <line x1="8" y1="10" x2="14" y2="10"></line>
+            </svg>
+            <span>古籍编辑器</span>
+        </div>
+
+        <nav class="toolbar-nav">
+            <div class="dropdown">
+                <button class="toolbar-btn" onclick="toggleDropdown(this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    文件
+                </button>
+                <div class="dropdown-menu">
+                    <div class="dropdown-item" onclick="createNewProject()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                        新建项目
+                    </div>
+                    <div class="dropdown-item" onclick="document.getElementById('openProjectInput').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        打开项目
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-item" onclick="saveProject()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        保存项目
+                    </div>
+                    <div class="dropdown-item" onclick="exportXML()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        导出XML
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button class="toolbar-btn" onclick="toggleDropdown(this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    编辑
+                </button>
+                <div class="dropdown-menu">
+                    <div class="dropdown-item" onclick="undoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                        撤销
+                    </div>
+                    <div class="dropdown-item" onclick="redoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+                        重做
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-item" onclick="deleteSelectedAnnotation()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        删除选中
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button class="toolbar-btn" onclick="toggleDropdown(this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                    视图
+                </button>
+                <div class="dropdown-menu">
+                    <div class="dropdown-item" onclick="zoomIn()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                        放大
+                    </div>
+                    <div class="dropdown-item" onclick="zoomOut()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                        缩小
+                    </div>
+                    <div class="dropdown-item" onclick="resetZoom()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+                        重置缩放
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button class="toolbar-btn" onclick="toggleDropdown(this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+                    工具
+                </button>
+                <div class="dropdown-menu">
+                    <div class="dropdown-item" onclick="openCharCreationModal()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>
+                        造字
+                    </div>
+                    <div class="dropdown-item" onclick="openCustomCharsPanel()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        字库管理
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="toolbar-spacer"></div>
+
+        <div class="toolbar-actions">
+            <button class="btn-secondary" onclick="document.getElementById('importImageInput').click()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                导入图片
+            </button>
+            <button class="btn-primary" onclick="saveProject()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                保存
+            </button>
+        </div>
+    </header>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 左侧面板 -->
+        <aside class="left-panel">
+            <div class="panel-section">
+                <h3 class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    项目管理
+                </h3>
+                <div class="project-actions">
+                    <button class="project-btn" onclick="createNewProject()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                        新建项目
+                    </button>
+                    <button class="project-btn" onclick="document.getElementById('openProjectInput').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        打开项目
+                    </button>
+                    <button class="project-btn" onclick="exportXML()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        导出XML
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel-section" style="padding-bottom: 0;">
+                <h3 class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    页面缩略图
+                </h3>
+            </div>
+            <div class="thumbnail-list" id="thumbnailList">
+                <!-- 缩略图将通过JS动态添加 -->
+            </div>
+        </aside>
+
+        <!-- 主编辑区域 -->
+        <main class="editor-area">
+            <!-- 编辑工具栏 -->
+            <div class="editor-toolbar">
+                <div class="tool-group">
+                    <button class="tool-btn active" id="selectTool" data-tooltip="选择工具" onclick="setTool('select')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg>
+                    </button>
+                    <button class="tool-btn" id="boxTool" data-tooltip="框选标注" onclick="setTool('box')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                    </button>
+                    <button class="tool-btn" id="underlineTool" data-tooltip="下划线" onclick="setTool('underline')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path><line x1="4" y1="21" x2="20" y2="21"></line></svg>
+                    </button>
+                    <button class="tool-btn" id="highlightTool" data-tooltip="高亮标注" onclick="setTool('highlight')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    </button>
+                    <button class="tool-btn" id="strikethroughTool" data-tooltip="删除线" onclick="setTool('strikethrough')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="20" y2="12"></line><path d="M17.5 7.5c0-2.5-2.5-4-5-4-1.5 0-3 .5-3 2 0 1 1 1.5 2 1.5"></path><path d="M6.5 16.5c0 2.5 2.5 4 5 4 1.5 0 3-.5 3-2 0-1-1-1.5-2-1.5"></path></svg>
+                    </button>
+                </div>
+
+                <div class="tool-group">
+                    <button class="tool-btn" data-tooltip="撤销" onclick="undoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                    </button>
+                    <button class="tool-btn" data-tooltip="重做" onclick="redoAction()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+                    </button>
+                </div>
+
+                <div class="page-nav">
+                    <button class="page-nav-btn" id="firstPageBtn" onclick="goToFirstPage()" data-tooltip="首页">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="11 17 6 12 11 7"></polyline><polyline points="18 17 13 12 18 7"></polyline></svg>
+                    </button>
+                    <button class="page-nav-btn" id="prevPageBtn" onclick="goToPrevPage()" data-tooltip="上一页">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <span class="page-indicator" id="pageIndicator">1 / 1</span>
+                    <button class="page-nav-btn" id="nextPageBtn" onclick="goToNextPage()" data-tooltip="下一页">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                    <button class="page-nav-btn" id="lastPageBtn" onclick="goToLastPage()" data-tooltip="末页">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+                    </button>
+                </div>
+
+                <div class="zoom-controls">
+                    <button class="tool-btn" onclick="zoomOut()" data-tooltip="缩小">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                    </button>
+                    <span class="zoom-value" id="zoomValue">100%</span>
+                    <button class="tool-btn" onclick="zoomIn()" data-tooltip="放大">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 画布区域 -->
+            <div class="canvas-container" id="canvasContainer">
+                <div class="empty-state" id="emptyState">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        <line x1="8" y1="6" x2="16" y2="6"></line>
+                        <line x1="8" y1="10" x2="14" y2="10"></line>
+                        <line x1="8" y1="14" x2="12" y2="14"></line>
+                    </svg>
+                    <h3>欢迎使用古籍在线编辑器</h3>
+                    <p>请新建项目或导入古籍图片开始编辑</p>
+                    <button class="btn-primary" onclick="document.getElementById('importImageInput').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        导入图片
+                    </button>
+                </div>
+                <div class="canvas-wrapper" id="canvasWrapper" style="display: none;">
+                    <canvas id="mainCanvas"></canvas>
+                    <canvas id="annotationLayer"></canvas>
+                    <canvas id="interactionLayer"></canvas>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧面板 -->
+        <aside class="right-panel">
+            <div class="property-section">
+                <div class="property-header">
+                    <h3 class="property-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        属性编辑
+                    </h3>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">简体字</label>
+                    <input type="text" class="form-input" id="simplifiedCharInput" placeholder="输入对应的简体字" oninput="updateAnnotationSimplified(this.value)">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">标注颜色</label>
+                    <div class="color-picker-group" id="colorPicker">
+                        <div class="color-swatch selected" style="background: var(--mark-red);" data-color="var(--mark-red)" onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: var(--mark-blue);" data-color="var(--mark-blue)" onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: var(--mark-green);" data-color="var(--mark-green)" onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: var(--mark-yellow);" data-color="var(--mark-yellow)" onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: var(--mark-purple);" data-color="var(--mark-purple)" onclick="selectColor(this)"></div>
+                        <div class="color-swatch" style="background: var(--mark-orange);" data-color="var(--mark-orange)" onclick="selectColor(this)"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">标注样式</label>
+                    <div class="mark-type-selector" id="markTypeSelector">
+                        <button class="mark-type-btn active" data-type="box" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                            框选
+                        </button>
+                        <button class="mark-type-btn" data-type="underline" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path><line x1="4" y1="21" x2="20" y2="21"></line></svg>
+                            下划线
+                        </button>
+                        <button class="mark-type-btn" data-type="highlight" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                            高亮
+                        </button>
+                        <button class="mark-type-btn" data-type="strikethrough" onclick="selectMarkType(this)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="20" y2="12"></line></svg>
+                            删除线
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">注释</label>
+                    <textarea class="form-input" id="annotationNoteInput" placeholder="输入注释信息" oninput="updateAnnotationNote(this.value)"></textarea>
+                </div>
+            </div>
+
+            <div class="property-section" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 0;">
+                <h3 class="property-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    当前页标注
+                    <span style="margin-left: auto; font-size: 12px; color: var(--color-text-light);" id="annotationCount">0 条</span>
+                </h3>
+                <div class="annotation-list" id="annotationList">
+                    <!-- 标注卡片将通过JS动态添加 -->
+                </div>
+            </div>
+
+            <div class="custom-chars-section">
+                <h3 class="property-title" style="cursor: pointer;" onclick="openCharCreationModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                    造字区
+                    <span style="margin-left: auto; font-size: 12px; color: var(--color-text-light);" id="customCharCount">0 个</span>
+                </h3>
+                <div class="custom-chars-grid" id="customCharsGrid">
+                    <!-- 造字将通过JS动态添加 -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="statusbar">
+        <div class="status-item">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">就绪</span>
+        </div>
+        <div class="status-item">
+            <span>页码: </span>
+            <span id="statusPage">-</span>
+        </div>
+        <div class="status-item">
+            <span>标注: </span>
+            <span id="statusAnnotations">0</span>
+        </div>
+        <div class="status-item">
+            <span>缩放: </span>
+            <span id="statusZoom">100%</span>
+        </div>
+    </footer>
+
+    <!-- 模态框: 新建项目 -->
+    <div class="modal-overlay project-modal" id="projectModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">新建项目</h2>
+                <button class="modal-close" onclick="closeModal('projectModal')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">古籍标题 *</label>
+                    <input type="text" class="form-input" id="projectTitle" placeholder="请输入古籍标题">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">作者</label>
+                        <input type="text" class="form-input" id="projectAuthor" placeholder="作者姓名">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">朝代</label>
+                        <input type="text" class="form-input" id="projectDynasty" placeholder="如：唐、宋、明">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">书籍名称</label>
+                        <input type="text" class="form-input" id="projectBook" placeholder="所属书籍">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">卷/期</label>
+                        <input type="text" class="form-input" id="projectVolume" placeholder="如：卷一">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">版本</label>
+                    <input type="text" class="form-input" id="projectVersion" placeholder="版本说明">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('projectModal')">取消</button>
+                <button class="btn-primary" onclick="confirmNewProject()">创建项目</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框: 造字 -->
+    <div class="modal-overlay char-creation-modal" id="charCreationModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">造字</h2>
+                <button class="modal-close" onclick="closeModal('charCreationModal')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="char-canvas-area">
+                    <div class="char-canvas-wrapper">
+                        <div class="char-canvas-container">
+                            <canvas id="charCanvas" width="256" height="256"></canvas>
+                        </div>
+                        <div class="char-tools">
+                            <button class="char-tool-btn active" id="brushTool" onclick="setCharTool('brush')" data-tooltip="画笔">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path></svg>
+                            </button>
+                            <button class="char-tool-btn" id="eraserTool" onclick="setCharTool('eraser')" data-tooltip="橡皮擦">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.6 2.6c.8-.8 2-.8 2.8 0L21 7.2c.8.8.8 2 0 2.8L11 20"></path><path d="M6 11l6 6"></path></svg>
+                            </button>
+                            <div style="width: 1px; height: 24px; background: var(--color-border); margin: 0 8px;"></div>
+                            <button class="char-tool-btn" id="clearCanvasBtn" onclick="clearCharCanvas()" data-tooltip="清除">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="char-info-panel">
+                        <div class="char-preview" id="charPreview">预览</div>
+                        <div class="unicode-display" id="unicodeDisplay">U+0000</div>
+                        <div class="form-group">
+                            <label class="form-label">字形名称</label>
+                            <input type="text" class="form-input" id="charNameInput" placeholder="为字形命名">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('charCreationModal')">取消</button>
+                <button class="btn-primary" onclick="saveCustomChar()">保存字形</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框: XML预览 -->
+    <div class="modal-overlay xml-preview-modal" id="xmlPreviewModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">XML 导出预览</h2>
+                <button class="modal-close" onclick="closeModal('xmlPreviewModal')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div class="xml-preview-content">
+                    <pre id="xmlContent"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('xmlPreviewModal')">关闭</button>
+                <button class="btn-primary" onclick="downloadXML()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    下载XML
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" id="importImageInput" class="hidden-input" accept="image/*" multiple onchange="handleImageImport(event)">
+    <input type="file" id="openProjectInput" class="hidden-input" accept=".json,.sdocproj" onchange="handleProjectOpen(event)">
+
+    <script>
+        // ===== 全局状态管理 =====
+        const state = {
+            project: null,
+            pages: [],
+            currentPageIndex: 0,
+            annotations: [],
+            customChars: [],
+            selectedAnnotation: null,
+            currentTool: 'select',
+            currentColor: '#C84A32',
+            currentMarkType: 'box',
+            zoom: 1,
+            isModified: false,
+            undoStack: [],
+            redoStack: []
+        };
+
+        // 颜色映射
+        const colorMap = {
+            'var(--mark-red)': '#C84A32',
+            'var(--mark-blue)': '#2B5F8E',
+            'var(--mark-green)': '#5B8C5A',
+            'var(--mark-yellow)': '#E8C547',
+            'var(--mark-purple)': '#7B5BA6',
+            'var(--mark-orange)': '#D67B3C'
+        };
+
+        // ===== 画布和上下文 =====
+        let mainCanvas, annotationCanvas, interactionCanvas;
+        let mainCtx, annotationCtx, interactionCtx;
+
+        // ===== 初始化 =====
+        function init() {
+            mainCanvas = document.getElementById('mainCanvas');
+            annotationCanvas = document.getElementById('annotationLayer');
+            interactionCanvas = document.getElementById('interactionLayer');
+
+            mainCtx = mainCanvas.getContext('2d');
+            annotationCtx = annotationCanvas.getContext('2d');
+            interactionCtx = interactionCanvas.getContext('2d');
+
+            setupEventListeners();
+            updateUI();
+        }
+
+        // ===== 事件监听 =====
+        function setupEventListeners() {
+            // 交互层鼠标事件
+            interactionCanvas.addEventListener('mousedown', handleCanvasMouseDown);
+            interactionCanvas.addEventListener('mousemove', handleCanvasMouseMove);
+            interactionCanvas.addEventListener('mouseup', handleCanvasMouseUp);
+            interactionCanvas.addEventListener('mouseleave', handleCanvasMouseUp);
+
+            // 滚轮缩放
+            document.getElementById('canvasContainer').addEventListener('wheel', handleWheelZoom);
+
+            // 点击外部关闭下拉菜单
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.dropdown')) {
+                    document.querySelectorAll('.dropdown.active').forEach(d => d.classList.remove('active'));
+                }
+            });
+
+            // ESC关闭模态框
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal-overlay.active').forEach(m => {
+                        m.classList.remove('active');
+                    });
+                }
+            });
+        }
+
+        // ===== 下拉菜单 =====
+        function toggleDropdown(btn) {
+            const dropdown = btn.closest('.dropdown');
+            document.querySelectorAll('.dropdown.active').forEach(d => {
+                if (d !== dropdown) d.classList.remove('active');
+            });
+            dropdown.classList.toggle('active');
+        }
+
+        // ===== 工具选择 =====
+        function setTool(tool) {
+            state.currentTool = tool;
+            document.querySelectorAll('.tool-btn[id$="Tool"]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tool + 'Tool')?.classList.add('active');
+            interactionCanvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+        }
+
+        // ===== 颜色选择 =====
+        function selectColor(el) {
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            el.classList.add('selected');
+            state.currentColor = colorMap[el.dataset.color] || el.style.background;
+            if (state.selectedAnnotation) {
+                state.selectedAnnotation.color = state.currentColor;
+                redrawAnnotations();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        // ===== 标注类型选择 =====
+        function selectMarkType(btn) {
+            document.querySelectorAll('.mark-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.currentMarkType = btn.dataset.type;
+            if (state.selectedAnnotation) {
+                state.selectedAnnotation.type = state.currentMarkType;
+                redrawAnnotations();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        // ===== 画布操作 =====
+        let isDrawing = false;
+        let startX, startY;
+        let currentRect = null;
+
+        function handleCanvasMouseDown(e) {
+            if (!state.pages.length) return;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / state.zoom;
+            const y = (e.clientY - rect.top) / state.zoom;
+
+            if (state.currentTool === 'select') {
+                // 检查是否点击了现有标注
+                const clicked = findAnnotationAt(x, y);
+                if (clicked) {
+                    selectAnnotation(clicked);
+                } else {
+                    deselectAnnotation();
+                }
+            } else {
+                isDrawing = true;
+                startX = x;
+                startY = y;
+                currentRect = { x, y, width: 0, height: 0 };
+            }
+        }
+
+        function handleCanvasMouseMove(e) {
+            if (!isDrawing) return;
+
+            const rect = interactionCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / state.zoom;
+            const y = (e.clientY - rect.top) / state.zoom;
+
+            currentRect.width = x - startX;
+            currentRect.height = y - startY;
+
+            drawCurrentRect();
+        }
+
+        function handleCanvasMouseUp(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            if (currentRect && Math.abs(currentRect.width) > 5 && Math.abs(currentRect.height) > 5) {
+                // 标准化矩形
+                const normalizedRect = {
+                    x: currentRect.width > 0 ? currentRect.x : currentRect.x + currentRect.width,
+                    y: currentRect.height > 0 ? currentRect.y : currentRect.y + currentRect.height,
+                    width: Math.abs(currentRect.width),
+                    height: Math.abs(currentRect.height)
+                };
+
+                createAnnotation(normalizedRect);
+            }
+
+            clearInteractionCanvas();
+            currentRect = null;
+        }
+
+        function drawCurrentRect() {
+            clearInteractionCanvas();
+            if (!currentRect) return;
+
+            interactionCtx.strokeStyle = state.currentColor;
+            interactionCtx.lineWidth = 2;
+            interactionCtx.setLineDash([5, 5]);
+            interactionCtx.strokeRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
+            interactionCtx.setLineDash([]);
+        }
+
+        function clearInteractionCanvas() {
+            interactionCtx.clearRect(0, 0, interactionCanvas.width, interactionCanvas.height);
+        }
+
+        // ===== 标注操作 =====
+        function createAnnotation(rect) {
+            const annotation = {
+                id: 'ann_' + Date.now(),
+                pageId: state.pages[state.currentPageIndex]?.id,
+                type: state.currentMarkType,
+                rect: rect,
+                color: state.currentColor,
+                simplifiedChar: '',
+                note: '',
+                originalChars: ''
+            };
+
+            state.annotations.push(annotation);
+            state.selectedAnnotation = annotation;
+
+            saveUndoState();
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function selectAnnotation(annotation) {
+            state.selectedAnnotation = annotation;
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+        }
+
+        function deselectAnnotation() {
+            state.selectedAnnotation = null;
+            redrawAnnotations();
+            updateAnnotationList();
+            clearPropertyPanel();
+        }
+
+        function deleteAnnotation(id) {
+            saveUndoState();
+            state.annotations = state.annotations.filter(a => a.id !== id);
+            if (state.selectedAnnotation?.id === id) {
+                state.selectedAnnotation = null;
+            }
+            redrawAnnotations();
+            updateAnnotationList();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function findAnnotationAt(x, y) {
+            // 从后往前查找（后添加的在上面）
+            for (let i = state.annotations.length - 1; i >= 0; i--) {
+                const ann = state.annotations[i];
+                if (ann.pageId === state.pages[state.currentPageIndex]?.id) {
+                    if (x >= ann.rect.x && x <= ann.rect.x + ann.rect.width &&
+                        y >= ann.rect.y && y <= ann.rect.y + ann.rect.height) {
+                        return ann;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function redrawAnnotations() {
+            annotationCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+
+            state.annotations.forEach(ann => {
+                if (ann.pageId !== state.pages[state.currentPageIndex]?.id) return;
+
+                const isSelected = state.selectedAnnotation?.id === ann.id;
+                annotationCtx.strokeStyle = ann.color;
+                annotationCtx.fillStyle = ann.color;
+
+                switch (ann.type) {
+                    case 'box':
+                        annotationCtx.lineWidth = isSelected ? 3 : 2;
+                        annotationCtx.setLineDash([]);
+                        annotationCtx.strokeRect(ann.rect.x, ann.rect.y, ann.rect.width, ann.rect.height);
+                        if (isSelected) {
+                            annotationCtx.strokeStyle = '#fff';
+                            annotationCtx.lineWidth = 1;
+                            annotationCtx.strokeRect(ann.rect.x - 2, ann.rect.y - 2, ann.rect.width + 4, ann.rect.height + 4);
+                        }
+                        break;
+                    case 'underline':
+                        annotationCtx.lineWidth = isSelected ? 4 : 3;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.rect.x, ann.rect.y + ann.rect.height);
+                        annotationCtx.lineTo(ann.rect.x + ann.rect.width, ann.rect.y + ann.rect.height);
+                        annotationCtx.stroke();
+                        break;
+                    case 'highlight':
+                        annotationCtx.globalAlpha = 0.3;
+                        annotationCtx.fillRect(ann.rect.x, ann.rect.y, ann.rect.width, ann.rect.height);
+                        annotationCtx.globalAlpha = 1;
+                        break;
+                    case 'strikethrough':
+                        annotationCtx.lineWidth = isSelected ? 4 : 3;
+                        annotationCtx.beginPath();
+                        annotationCtx.moveTo(ann.rect.x, ann.rect.y + ann.rect.height / 2);
+                        annotationCtx.lineTo(ann.rect.x + ann.rect.width, ann.rect.y + ann.rect.height / 2);
+                        annotationCtx.stroke();
+                        break;
+                }
+            });
+        }
+
+        // ===== 属性面板更新 =====
+        function updatePropertyPanel() {
+            if (!state.selectedAnnotation) {
+                clearPropertyPanel();
+                return;
+            }
+
+            document.getElementById('simplifiedCharInput').value = state.selectedAnnotation.simplifiedChar || '';
+            document.getElementById('annotationNoteInput').value = state.selectedAnnotation.note || '';
+
+            // 更新颜色选择
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.remove('selected');
+                const colorValue = colorMap[s.dataset.color] || s.style.background;
+                if (colorValue === state.selectedAnnotation.color) {
+                    s.classList.add('selected');
+                }
+            });
+
+            // 更新标注类型选择
+            document.querySelectorAll('.mark-type-btn').forEach(b => {
+                b.classList.remove('active');
+                if (b.dataset.type === state.selectedAnnotation.type) {
+                    b.classList.add('active');
+                }
+            });
+        }
+
+        function clearPropertyPanel() {
+            document.getElementById('simplifiedCharInput').value = '';
+            document.getElementById('annotationNoteInput').value = '';
+        }
+
+        function updateAnnotationSimplified(value) {
+            if (state.selectedAnnotation) {
+                state.selectedAnnotation.simplifiedChar = value;
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        function updateAnnotationNote(value) {
+            if (state.selectedAnnotation) {
+                state.selectedAnnotation.note = value;
+                markAsModified();
+            }
+        }
+
+        function updateAnnotationList() {
+            const container = document.getElementById('annotationList');
+            const pageAnnotations = state.annotations.filter(a =>
+                a.pageId === state.pages[state.currentPageIndex]?.id
+            );
+
+            document.getElementById('annotationCount').textContent = pageAnnotations.length + ' 条';
+
+            if (pageAnnotations.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--color-text-light); font-size: 13px;">暂无标注<br>使用上方工具进行标注</div>';
+                return;
+            }
+
+            container.innerHTML = pageAnnotations.map(ann => `
+                <div class="annotation-card ${state.selectedAnnotation?.id === ann.id ? 'selected' : ''}"
+                     onclick="selectAnnotationById('${ann.id}')">
+                    <div class="annotation-preview">
+                        <div class="annotation-char" style="border-left: 3px solid ${ann.color};">
+                            ${ann.simplifiedChar || '?'}
+                        </div>
+                        <div class="annotation-info">
+                            <div class="annotation-simplified">${ann.simplifiedChar || '（未填写）'}</div>
+                            <div class="annotation-type">${getMarkTypeName(ann.type)} · ${ann.color}</div>
+                        </div>
+                    </div>
+                    <div class="annotation-actions">
+                        <button class="annotation-action-btn" onclick="event.stopPropagation(); editAnnotation('${ann.id}')" data-tooltip="编辑">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button class="annotation-action-btn delete" onclick="event.stopPropagation(); deleteAnnotation('${ann.id}')" data-tooltip="删除">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectAnnotationById(id) {
+            const ann = state.annotations.find(a => a.id === id);
+            if (ann) selectAnnotation(ann);
+        }
+
+        function editAnnotation(id) {
+            const ann = state.annotations.find(a => a.id === id);
+            if (ann) selectAnnotation(ann);
+        }
+
+        function getMarkTypeName(type) {
+            const names = {
+                'box': '框选',
+                'underline': '下划线',
+                'highlight': '高亮',
+                'strikethrough': '删除线'
+            };
+            return names[type] || type;
+        }
+
+        // ===== 页面管理 =====
+        function handleImageImport(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+
+            // 创建新项目（如果没有）
+            if (!state.project) {
+                openModal('projectModal');
+            }
+
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        addPage({
+                            id: 'page_' + Date.now() + '_' + index,
+                            pageNo: state.pages.length + 1,
+                            imageSrc: e.target.result,
+                            width: img.width,
+                            height: img.height
+                        });
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            event.target.value = '';
+        }
+
+        function addPage(page) {
+            state.pages.push(page);
+            updateThumbnailList();
+
+            if (state.pages.length === 1) {
+                loadPage(0);
+            }
+
+            updatePageNavButtons();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function loadPage(index) {
+            if (index < 0 || index >= state.pages.length) return;
+
+            state.currentPageIndex = index;
+            const page = state.pages[index];
+
+            // 设置画布大小
+            mainCanvas.width = page.width;
+            mainCanvas.height = page.height;
+            annotationCanvas.width = page.width;
+            annotationCanvas.height = page.height;
+            interactionCanvas.width = page.width;
+            interactionCanvas.height = page.height;
+
+            // 加载图片
+            const img = new Image();
+            img.onload = () => {
+                mainCtx.drawImage(img, 0, 0);
+                hideEmptyState();
+                redrawAnnotations();
+                updateAnnotationList();
+            };
+            img.src = page.imageSrc;
+
+            // 更新UI
+            updatePageIndicator();
+            updateThumbnailList();
+            updatePageNavButtons();
+            updateStatusBar();
+        }
+
+        function updateThumbnailList() {
+            const container = document.getElementById('thumbnailList');
+
+            if (state.pages.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--color-text-light); font-size: 13px;">暂无页面<br>导入图片开始</div>';
+                return;
+            }
+
+            container.innerHTML = state.pages.map((page, index) => `
+                <div class="thumbnail-item ${index === state.currentPageIndex ? 'active' : ''}"
+                     onclick="loadPage(${index})">
+                    <img src="${page.imageSrc}" alt="Page ${index + 1}">
+                    <span class="thumbnail-page">${index + 1}</span>
+                    <button class="thumbnail-delete" onclick="event.stopPropagation(); deletePage(${index})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function deletePage(index) {
+            if (state.pages.length <= 1) {
+                state.pages = [];
+                state.annotations = [];
+                state.currentPageIndex = 0;
+                showEmptyState();
+                clearCanvases();
+            } else {
+                // 删除该页的标注
+                const pageId = state.pages[index].id;
+                state.annotations = state.annotations.filter(a => a.pageId !== pageId);
+                state.pages.splice(index, 1);
+
+                // 重新编号
+                state.pages.forEach((p, i) => p.pageNo = i + 1);
+
+                if (state.currentPageIndex >= state.pages.length) {
+                    state.currentPageIndex = state.pages.length - 1;
+                }
+                loadPage(state.currentPageIndex);
+            }
+
+            updateThumbnailList();
+            updatePageNavButtons();
+            updateStatusBar();
+            markAsModified();
+        }
+
+        function goToFirstPage() {
+            loadPage(0);
+        }
+
+        function goToPrevPage() {
+            loadPage(state.currentPageIndex - 1);
+        }
+
+        function goToNextPage() {
+            loadPage(state.currentPageIndex + 1);
+        }
+
+        function goToLastPage() {
+            loadPage(state.pages.length - 1);
+        }
+
+        function updatePageNavButtons() {
+            document.getElementById('firstPageBtn').disabled = state.currentPageIndex <= 0;
+            document.getElementById('prevPageBtn').disabled = state.currentPageIndex <= 0;
+            document.getElementById('nextPageBtn').disabled = state.currentPageIndex >= state.pages.length - 1;
+            document.getElementById('lastPageBtn').disabled = state.currentPageIndex >= state.pages.length - 1;
+        }
+
+        function updatePageIndicator() {
+            document.getElementById('pageIndicator').textContent =
+                `${state.currentPageIndex + 1} / ${Math.max(1, state.pages.length)}`;
+        }
+
+        // ===== 缩放控制 =====
+        function zoomIn() {
+            state.zoom = Math.min(4, state.zoom + 0.25);
+            applyZoom();
+        }
+
+        function zoomOut() {
+            state.zoom = Math.max(0.25, state.zoom - 0.25);
+            applyZoom();
+        }
+
+        function resetZoom() {
+            state.zoom = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const wrapper = document.getElementById('canvasWrapper');
+            wrapper.style.transform = `scale(${state.zoom})`;
+            document.getElementById('zoomValue').textContent = Math.round(state.zoom * 100) + '%';
+            document.getElementById('statusZoom').textContent = Math.round(state.zoom * 100) + '%';
+        }
+
+        function handleWheelZoom(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    zoomIn();
+                } else {
+                    zoomOut();
+                }
+            }
+        }
+
+        // ===== 项目管理 =====
+        function createNewProject() {
+            openModal('projectModal');
+        }
+
+        function confirmNewProject() {
+            const title = document.getElementById('projectTitle').value.trim();
+            if (!title) {
+                alert('请输入古籍标题');
+                return;
+            }
+
+            state.project = {
+                id: 'proj_' + Date.now(),
+                title: title,
+                author: document.getElementById('projectAuthor').value,
+                dynasty: document.getElementById('projectDynasty').value,
+                book: document.getElementById('projectBook').value,
+                volume: document.getElementById('projectVolume').value,
+                version: document.getElementById('projectVersion').value,
+                createdAt: new Date().toISOString()
+            };
+
+            state.pages = [];
+            state.annotations = [];
+            state.customChars = [];
+            state.currentPageIndex = 0;
+
+            closeModal('projectModal');
+            showEmptyState();
+            updateUI();
+            updateStatusBar();
+            markAsModified();
+
+            // 清空表单
+            document.getElementById('projectTitle').value = '';
+            document.getElementById('projectAuthor').value = '';
+            document.getElementById('projectDynasty').value = '';
+            document.getElementById('projectBook').value = '';
+            document.getElementById('projectVolume').value = '';
+            document.getElementById('projectVersion').value = '';
+        }
+
+        function handleProjectOpen(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    loadProject(data);
+                } catch (err) {
+                    alert('无法打开项目文件：' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function loadProject(data) {
+            state.project = data.project;
+            state.pages = data.pages || [];
+            state.annotations = data.annotations || [];
+            state.customChars = data.customChars || [];
+            state.currentPageIndex = 0;
+
+            updateThumbnailList();
+
+            if (state.pages.length > 0) {
+                loadPage(0);
+            } else {
+                showEmptyState();
+            }
+
+            updateCustomCharsGrid();
+            updateStatusBar();
+            state.isModified = false;
+            updateStatusBar();
+        }
+
+        function saveProject() {
+            if (!state.project) {
+                openModal('projectModal');
+                return;
+            }
+
+            const projectData = {
+                project: state.project,
+                pages: state.pages,
+                annotations: state.annotations,
+                customChars: state.customChars,
+                savedAt: new Date().toISOString()
+            };
+
+            const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${state.project.title || '古籍项目'}_${new Date().toISOString().split('T')[0]}.sdocproj`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            state.isModified = false;
+            updateStatusBar();
+            setStatus('项目已保存', 'saved');
+        }
+
+        // ===== XML导出 =====
+        function exportXML() {
+            if (!state.project) {
+                alert('请先创建或打开项目');
+                return;
+            }
+
+            const xml = generateSDOC();
+            document.getElementById('xmlContent').textContent = xml;
+            openModal('xmlPreviewModal');
+        }
+
+        function downloadXML() {
+            const xml = document.getElementById('xmlContent').textContent;
+            const blob = new Blob([xml], { type: 'application/xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${state.project.title || '古籍'}.xml`;
+            a.click();
+            URL.revokeObjectURL(url);
+            closeModal('xmlPreviewModal');
+        }
+
+        function generateSDOC() {
+            const proj = state.project;
+            const annotations = state.annotations;
+
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+            xml += `<article id="${proj?.id || 'article_1'}" type="1" version="1.0">\n`;
+
+            // head
+            xml += `  <head>\n`;
+            if (proj?.title) {
+                xml += `    <title name="">${escapeXml(proj.title)}</title>\n`;
+            }
+            if (proj?.author) {
+                xml += `    <authors>\n`;
+                xml += `      <author name="${escapeXml(proj.author)}" type="0"/>\n`;
+                xml += `    </authors>\n`;
+            }
+            if (proj?.book) {
+                xml += `    <book name="${escapeXml(proj.book)}" volume="${escapeXml(proj.volume || '')}" pages="${state.pages.length}"/>\n`;
+            }
+            if (proj?.dynasty) {
+                xml += `    <date dynasty="${escapeXml(proj.dynasty)}"/>\n`;
+            }
+            xml += `  </head>\n`;
+
+            // content
+            xml += `  <content page_mode="1">\n`;
+            state.pages.forEach((page, i) => {
+                const pageAnnotations = annotations.filter(a => a.pageId === page.id);
+                xml += `    <page id="${page.id}" page_no="${i + 1}">\n`;
+                xml += `      <panel>\n`;
+                pageAnnotations.forEach(ann => {
+                    xml += `        <textfield id="${ann.id}" simplified="${escapeXml(ann.simplifiedChar || '')}" note="${escapeXml(ann.note || '')}"/>\n`;
+                });
+                xml += `      </panel>\n`;
+                xml += `    </page>\n`;
+            });
+            xml += `  </content>\n`;
+
+            // view
+            xml += `  <view count="${state.pages.length}">\n`;
+            state.pages.forEach((page, i) => {
+                const pageAnnotations = annotations.filter(a => a.pageId === page.id);
+                xml += `    <svg id="svg_${page.id}" page_no="${i + 1}" width="${page.width}" height="${page.height}">\n`;
+                pageAnnotations.forEach(ann => {
+                    const colorHex = ann.color;
+                    switch (ann.type) {
+                        case 'box':
+                            xml += `      <rect x="${ann.rect.x}" y="${ann.rect.y}" width="${ann.rect.width}" height="${ann.rect.height}" style="fill:none;stroke:${colorHex};stroke-width:2"/>\n`;
+                            break;
+                        case 'underline':
+                            xml += `      <line x1="${ann.rect.x}" y1="${ann.rect.y + ann.rect.height}" x2="${ann.rect.x + ann.rect.width}" y2="${ann.rect.y + ann.rect.height}" style="stroke:${colorHex};stroke-width:3"/>\n`;
+                            break;
+                        case 'highlight':
+                            xml += `      <rect x="${ann.rect.x}" y="${ann.rect.y}" width="${ann.rect.width}" height="${ann.rect.height}" style="fill:${colorHex};fill-opacity:0.3;stroke:none"/>\n`;
+                            break;
+                        case 'strikethrough':
+                            xml += `      <line x1="${ann.rect.x}" y1="${ann.rect.y + ann.rect.height/2}" x2="${ann.rect.x + ann.rect.width}" y2="${ann.rect.y + ann.rect.height/2}" style="stroke:${colorHex};stroke-width:3"/>\n`;
+                            break;
+                    }
+                });
+                xml += `    </svg>\n`;
+            });
+            xml += `  </view>\n`;
+
+            // sources
+            xml += `  <sources>\n`;
+            state.pages.forEach((page, i) => {
+                xml += `    <source src="${escapeXml(page.imageSrc)}" pageno="${i + 1}"/>\n`;
+            });
+            xml += `  </sources>\n`;
+
+            xml += `</article>`;
+
+            return xml;
+        }
+
+        function escapeXml(str) {
+            if (!str) return '';
+            return str.replace(/[<>&'"]/g, c => ({
+                '<': '&lt;',
+                '>': '&gt;',
+                '&': '&amp;',
+                "'": '&apos;',
+                '"': '&quot;'
+            }[c]));
+        }
+
+        // ===== 造字功能 =====
+        let charCanvas, charCtx;
+        let isDrawingChar = false;
+        let charTool = 'brush';
+
+        function openCharCreationModal() {
+            openModal('charCreationModal');
+
+            setTimeout(() => {
+                charCanvas = document.getElementById('charCanvas');
+                charCtx = charCanvas.getContext('2d');
+                charCtx.fillStyle = '#fff';
+                charCtx.fillRect(0, 0, charCanvas.width, charCanvas.height);
+                charCtx.strokeStyle = '#000';
+                charCtx.lineWidth = 8;
+                charCtx.lineCap = 'round';
+                charCtx.lineJoin = 'round';
+
+                // 绑定画布事件
+                charCanvas.addEventListener('mousedown', handleCharCanvasMouseDown);
+                charCanvas.addEventListener('mousemove', handleCharCanvasMouseMove);
+                charCanvas.addEventListener('mouseup', handleCharCanvasMouseUp);
+                charCanvas.addEventListener('mouseleave', handleCharCanvasMouseUp);
+
+                updateCharPreview();
+            }, 100);
+        }
+
+        function setCharTool(tool) {
+            charTool = tool;
+            document.getElementById('brushTool').classList.toggle('active', tool === 'brush');
+            document.getElementById('eraserTool').classList.toggle('active', tool === 'eraser');
+            charCtx.lineWidth = tool === 'eraser' ? 20 : 8;
+        }
+
+        function handleCharCanvasMouseDown(e) {
+            isDrawingChar = true;
+            const rect = charCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            charCtx.beginPath();
+            charCtx.moveTo(x, y);
+        }
+
+        function handleCharCanvasMouseMove(e) {
+            if (!isDrawingChar) return;
+            const rect = charCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            charCtx.lineTo(x, y);
+            charCtx.stroke();
+        }
+
+        function handleCharCanvasMouseUp() {
+            isDrawingChar = false;
+            updateCharPreview();
+        }
+
+        function clearCharCanvas() {
+            charCtx.fillStyle = '#fff';
+            charCtx.fillRect(0, 0, charCanvas.width, charCanvas.height);
+            updateCharPreview();
+        }
+
+        function updateCharPreview() {
+            const preview = document.getElementById('charPreview');
+            const unicodeDisplay = document.getElementById('unicodeDisplay');
+
+            if (!charCanvas) return;
+
+            // 创建一个临时画布来缩放预览
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 64;
+            tempCanvas.height = 64;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(charCanvas, 0, 0, 64, 64);
+
+            preview.textContent = '';
+            preview.style.backgroundImage = `url(${tempCanvas.toDataURL()})`;
+            preview.style.backgroundSize = 'contain';
+            preview.style.backgroundRepeat = 'no-repeat';
+            preview.style.backgroundPosition = 'center';
+
+            // 生成Unicode编码（简单模拟）
+            const code = 0xE000 + (state.customChars.length % 4096);
+            unicodeDisplay.textContent = 'U+' + code.toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        function saveCustomChar() {
+            if (!charCanvas) return;
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 64;
+            tempCanvas.height = 64;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(charCanvas, 0, 0, 64, 64);
+
+            const code = 0xE000 + state.customChars.length;
+
+            const customChar = {
+                id: 'char_' + Date.now(),
+                unicode: code,
+                name: document.getElementById('charNameInput').value || '新造字',
+                imageData: tempCanvas.toDataURL()
+            };
+
+            state.customChars.push(customChar);
+            updateCustomCharsGrid();
+            closeModal('charCreationModal');
+            markAsModified();
+
+            // 清空表单
+            document.getElementById('charNameInput').value = '';
+        }
+
+        function updateCustomCharsGrid() {
+            const container = document.getElementById('customCharsGrid');
+            document.getElementById('customCharCount').textContent = state.customChars.length + ' 个';
+
+            if (state.customChars.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 16px; color: var(--color-text-light); font-size: 12px;">暂无造字</div>';
+                return;
+            }
+
+            container.innerHTML = state.customChars.map(char => `
+                <div class="custom-char-item" onclick="useCustomChar('${char.id}')" title="${char.name} (U+${char.unicode.toString(16).toUpperCase().padStart(4, '0')})">
+                    <img src="${char.imageData}" alt="${char.name}" style="width: 100%; height: 100%; object-fit: contain;">
+                </div>
+            `).join('');
+        }
+
+        function useCustomChar(charId) {
+            const char = state.customChars.find(c => c.id === charId);
+            if (char && state.selectedAnnotation) {
+                state.selectedAnnotation.simplifiedChar = char.name;
+                updatePropertyPanel();
+                updateAnnotationList();
+                markAsModified();
+            }
+        }
+
+        function openCustomCharsPanel() {
+            // 打开造字模态框
+            openCharCreationModal();
+        }
+
+        // ===== 撤销/重做 =====
+        function saveUndoState() {
+            state.undoStack.push(JSON.stringify(state.annotations));
+            state.redoStack = [];
+        }
+
+        function undoAction() {
+            if (state.undoStack.length === 0) return;
+
+            state.redoStack.push(JSON.stringify(state.annotations));
+            state.annotations = JSON.parse(state.undoStack.pop());
+            state.selectedAnnotation = null;
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+            markAsModified();
+        }
+
+        function redoAction() {
+            if (state.redoStack.length === 0) return;
+
+            state.undoStack.push(JSON.stringify(state.annotations));
+            state.annotations = JSON.parse(state.redoStack.pop());
+            state.selectedAnnotation = null;
+
+            redrawAnnotations();
+            updateAnnotationList();
+            updatePropertyPanel();
+            markAsModified();
+        }
+
+        function deleteSelectedAnnotation() {
+            if (state.selectedAnnotation) {
+                deleteAnnotation(state.selectedAnnotation.id);
+            }
+        }
+
+        // ===== UI更新 =====
+        function updateUI() {
+            updateThumbnailList();
+            updatePageNavButtons();
+            updatePageIndicator();
+            updateAnnotationList();
+            updateCustomCharsGrid();
+        }
+
+        function updateStatusBar() {
+            document.getElementById('statusPage').textContent =
+                state.pages.length > 0 ? `${state.currentPageIndex + 1} / ${state.pages.length}` : '-';
+            document.getElementById('statusAnnotations').textContent = state.annotations.length;
+            document.getElementById('statusZoom').textContent = Math.round(state.zoom * 100) + '%';
+        }
+
+        function markAsModified() {
+            state.isModified = true;
+            document.getElementById('statusDot').classList.add('modified');
+            document.getElementById('statusText').textContent = '已修改';
+        }
+
+        function setStatus(text, type) {
+            document.getElementById('statusText').textContent = text;
+            if (type === 'saved') {
+                document.getElementById('statusDot').classList.remove('modified');
+            }
+        }
+
+        function showEmptyState() {
+            document.getElementById('emptyState').style.display = 'flex';
+            document.getElementById('canvasWrapper').style.display = 'none';
+        }
+
+        function hideEmptyState() {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('canvasWrapper').style.display = 'block';
+        }
+
+        function clearCanvases() {
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            annotationCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+            interactionCtx.clearRect(0, 0, interactionCanvas.width, interactionCanvas.height);
+        }
+
+        // ===== 模态框控制 =====
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // ===== 页面加载完成后初始化 =====
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.inland-security-footer {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  right: 0;
+  width: fit-content;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tooltip-container {
+  position: relative;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.minimax-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 300;
+  color: #adadad;
+  text-decoration: none;
+}
+
+.minimax-link:visited {
+  color: #adadad;
+}
+
+.minimax-link:hover {
+  color: #666666;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: 16px; /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+  font-size: 12px;
+  line-height: 17px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #171717;
+}
+
+/* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+.tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: flex;
+}
+
+.info-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.beian-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #171717;
+}
+
+.beian-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.underline-text {
+  color: #171717;
+  text-decoration: underline;
+}
+
+.underline-text:hover {
+  color: #000000;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .trigger-content {
+    background-color: transparent;
+  }
+
+  .minimax-link,
+  .minimax-link:visited {
+    color: #666666;
+  }
+
+  .minimax-link:hover {
+    color: #adadad;
+  }
+
+  .tooltip-content {
+    background-color: #262626;
+    color: #ededed;
+  }
+
+  .beian-link,
+  .underline-text {
+    color: #ededed;
+  }
+
+  .underline-text:hover {
+    color: #ffffff;
+  }
+}
+
+</style>
+<div class="inland-security-footer">
+  <div class="tooltip-container">
+    <div class="trigger-content">
+      <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+        <span>© 2026 MiniMax</span>
+      </a>
+    </div>
+    <div class="tooltip-content">
+      <section class="info-section">
+        <span>上海稀宇科技有限公司</span>
+      </section>
+
+      <section class="info-section">
+        <a class="beian-link" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179" target="_blank" rel="noreferrer">
+          <img alt="hailuo-beian-icon" src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png" class="beian-icon">
+          <span class="underline-text">沪公网安备31010402010179号</span>
+        </a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+          沪ICP备2023003282号-38
+        </a>
+      </section>
+
+      <section class="info-section">
+        <span>模型名称：MiniMax</span>
+        <span>备案号：Shanghai-MiniMax-202505230046</span>
+      </section>
+
+      <section class="info-section">
+        <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer" class="underline-text">
+          用户协议
+        </a>
+        <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer" class="underline-text">
+          隐私政策
+        </a>
+      </section>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/**
+ * Iframe 元素高亮注入脚本
+ * 需要在目标网站中引入此脚本来支持跨域 iframe 高亮功能
+ *
+ * 使用方法：
+ * 1. 将此脚本添加到目标网站的 HTML 中
+ * 2. 或通过浏览器扩展、用户脚本等方式注入
+ */
+
+(function () {
+  "use strict";
+
+  // 检查是否在 iframe 中
+  if (window.self === window.top) {
+    return; // 不在 iframe 中，不执行
+  }
+
+  // 检查是否已经初始化过
+  if (window.__iframeHighlightInitialized) {
+    return;
+  }
+  window.__iframeHighlightInitialized = true;
+  console.log("Iframe 高亮脚本已加载");
+
+  // 创建高亮覆盖层
+  var overlay = document.createElement("div");
+  overlay.id = "iframe-highlight-overlay";
+  overlay.style.cssText = "\n    position: fixed;\n    top: 0;\n    left: 0;\n    width: 100vw;\n    height: 100vh;\n    pointer-events: none;\n    z-index: 999999;\n    overflow: hidden;\n  ";
+
+  // 创建悬停高亮框（虚线边框）
+  var highlightBox = document.createElement("div");
+  highlightBox.id = "iframe-highlight-box";
+  highlightBox.style.cssText = "\n    position: absolute;\n    border: 2px dashed #007AFF;\n    background: rgba(0, 122, 255, 0.08);\n    pointer-events: none;\n    display: none;\n    transition: all 0.1s ease;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);\n    border-radius: 2px;\n  ";
+
+  // 创建选中节点的常驻高亮框（实线边框）
+  var selectedBox = document.createElement("div");
+  selectedBox.id = "iframe-selected-box";
+  selectedBox.style.cssText = "\n    position: absolute;\n    border: 2px solid #007AFF;\n    pointer-events: none;\n    display: none;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 8px rgba(255, 107, 53, 0.4);\n    border-radius: 2px;\n    z-index: 1000000;\n  ";
+
+  // 创建悬停标签显示
+  var tagLabel = document.createElement("div");
+  tagLabel.id = "iframe-tag-label";
+  tagLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 2px 6px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 2px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000001;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);\n    font-weight: 500;\n  ";
+
+  // 创建选中节点标签
+  var selectedLabel = document.createElement("div");
+  selectedLabel.id = "iframe-selected-label";
+  selectedLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 3px 8px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 3px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000002;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);\n    font-weight: 600;\n  ";
+  overlay.appendChild(highlightBox);
+  overlay.appendChild(selectedBox);
+  overlay.appendChild(tagLabel);
+  overlay.appendChild(selectedLabel);
+  document.body.appendChild(overlay);
+
+  // 存储当前选中的元素
+  var selectedElement = null;
+  var highlightEnabled = false;
+
+  // 更新选中元素的高亮显示
+  function updateSelectedHighlight(element) {
+    console.log("updateSelectedHighlight called with:", element);
+    if (!element) {
+      selectedBox.style.display = "none";
+      selectedLabel.style.display = "none";
+      selectedElement = null;
+      console.log("Cleared selected highlight");
+      return;
+    }
+    selectedElement = element;
+    var rect = element.getBoundingClientRect();
+    console.log("Selected element rect:", rect);
+
+    // 更新选中高亮框位置
+    selectedBox.style.display = "block";
+    selectedBox.style.left = "".concat(rect.left - 2, "px");
+    selectedBox.style.top = "".concat(rect.top - 2, "px");
+    selectedBox.style.width = "".concat(rect.width + 4, "px");
+    selectedBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新选中标签位置和内容
+    selectedLabel.style.display = "block";
+    selectedLabel.textContent = "\u2713 <".concat(element.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 28;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 5) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    var labelWidth = selectedLabel.offsetWidth || 100; // 预估宽度
+    if (labelLeft + labelWidth > window.innerWidth - 10) {
+      labelLeft = window.innerWidth - labelWidth - 10;
+    }
+    selectedLabel.style.left = "".concat(Math.max(5, labelLeft), "px");
+    selectedLabel.style.top = "".concat(labelTop, "px");
+    console.log("Selected highlight positioned at:", {
+      left: selectedBox.style.left,
+      top: selectedBox.style.top,
+      width: selectedBox.style.width,
+      height: selectedBox.style.height
+    });
+  }
+  function getElementSelector(element) {
+    if (!(element instanceof Element)) throw new Error('Argument must be a DOM element');
+    var segments = [];
+    var current = element;
+    while (current !== document.documentElement) {
+      var selector = '';
+      // 优先检查唯一ID
+      if (current.id && document.querySelectorAll("#".concat(current.id)).length === 1) {
+        segments.unshift("#".concat(current.id));
+        break; // ID唯一，无需继续向上
+      }
+
+      // 生成类名选择器（取第一个有效类名）
+      var classes = Array.from(current.classList).filter(function (c) {
+        return !c.startsWith('js-');
+      });
+      var className = classes.length > 0 ? ".".concat(classes[0]) : '';
+
+      // 生成位置索引（nth-child）
+      var tag = current.tagName.toLowerCase();
+      if (!className) {
+        var siblings = Array.from(current.parentNode.children);
+        var index = siblings.findIndex(function (el) {
+          return el === current;
+        }) + 1;
+        selector = "".concat(tag, ":nth-child(").concat(index, ")");
+      } else {
+        selector = className;
+      }
+      segments.unshift(selector);
+      current = current.parentElement;
+    }
+
+    // 处理根元素
+    if (current === document.documentElement) {
+      segments.unshift('html');
+    }
+    return segments.join(' > ');
+  }
+
+  // 获取元素文本内容
+  function getElementText(element) {
+    var _element$textContent;
+    if (element.tagName === "INPUT") {
+      return element.value || element.placeholder || "";
+    }
+    if (element.tagName === "TEXTAREA") {
+      return element.value || element.placeholder || "";
+    }
+    var text = ((_element$textContent = element.textContent) === null || _element$textContent === void 0 ? void 0 : _element$textContent.trim()) || "";
+    return text.length > 50 ? text.substring(0, 50) + "..." : text;
+  }
+
+  // 获取元素属性信息
+  function getElementAttributes(element) {
+    var attrs = {};
+    for (var i = 0; i < element.attributes.length; i++) {
+      var attr = element.attributes[i];
+      attrs[attr.name] = attr.value;
+    }
+    return attrs;
+  }
+
+  // 鼠标悬停事件处理
+  function handleMouseOver(e) {
+    if (!highlightEnabled) return;
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免高亮 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 如果是已选中的元素，不显示悬停高亮
+    if (target === selectedElement) {
+      highlightBox.style.display = "none";
+      tagLabel.style.display = "none";
+      return;
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+
+    // 更新悬停高亮框位置
+    highlightBox.style.display = "block";
+    highlightBox.style.left = "".concat(rect.left - 2, "px");
+    highlightBox.style.top = "".concat(rect.top - 2, "px");
+    highlightBox.style.width = "".concat(rect.width + 4, "px");
+    highlightBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新标签位置和内容
+    tagLabel.style.display = "block";
+    tagLabel.textContent = "<".concat(target.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 22;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 0) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    if (labelLeft + tagLabel.offsetWidth > window.innerWidth) {
+      labelLeft = window.innerWidth - tagLabel.offsetWidth - 5;
+    }
+    tagLabel.style.left = "".concat(Math.max(0, labelLeft), "px");
+    tagLabel.style.top = "".concat(labelTop, "px");
+
+    // 发送消息到父窗口
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 鼠标离开事件处理
+  function handleMouseOut(e) {
+    if (!highlightEnabled) return;
+    var relatedTarget = e.relatedTarget;
+
+    // 如果鼠标移动到高亮相关元素上，不隐藏高亮
+    if (relatedTarget && (relatedTarget === highlightBox || relatedTarget === tagLabel || relatedTarget === overlay || relatedTarget === selectedBox || relatedTarget === selectedLabel)) {
+      return;
+    }
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: null,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 点击事件处理
+  function handleClick(e) {
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免处理 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 检查是否是交互元素，这些元素需要保留默认行为
+    var isInteractiveElement = ['input', 'textarea', 'select', 'button', 'a'].includes(target.tagName.toLowerCase());
+
+    // 如果高亮功能启用，对于非交互元素阻止默认行为和事件传播
+    if (highlightEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+    console.log("Element clicked:", {
+      tagName: target.tagName,
+      selector: selector,
+      rect: rect
+    });
+
+    // 立即更新选中高亮
+    updateSelectedHighlight(target);
+
+    // 隐藏悬停高亮，因为现在是选中状态
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-click",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 监听来自父窗口的消息
+  function handleParentMessage(event) {
+    console.log("Received message from parent:", event.data);
+    if (event.data.type === "iframe-highlight-toggle") {
+      var enabled = event.data.enabled;
+      console.log("Highlight toggle:", enabled);
+      if (enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "enable-iframe-highlight") {
+      console.log("Enable iframe highlight");
+      enableHighlight();
+    } else if (event.data.type === "disable-iframe-highlight") {
+      console.log("Disable iframe highlight");
+      disableHighlight();
+    } else if (event.data.type === "toggle-iframe-highlight") {
+      var _enabled = event.data.enabled !== undefined ? event.data.enabled : !highlightEnabled;
+      console.log("Toggle iframe highlight to:", _enabled);
+      if (_enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "update-selected-element") {
+      var selector = event.data.selector;
+      console.log("Update selected element with selector:", selector);
+      if (selector) {
+        try {
+          var element = document.querySelector(selector);
+          console.log("Found element by selector:", element);
+          updateSelectedHighlight(element);
+        } catch (error) {
+          console.warn("Failed to select element:", error);
+          updateSelectedHighlight(null);
+        }
+      } else {
+        updateSelectedHighlight(null);
+      }
+    } else if (event.data.type === "clear-selected-element") {
+      console.log("Clear selected element");
+      updateSelectedHighlight(null);
+    }
+  }
+
+  // 启用高亮功能
+  function enableHighlight() {
+    console.log("Enabling highlight");
+    document.addEventListener("mouseover", handleMouseOver, true);
+    document.addEventListener("mouseout", handleMouseOut, true);
+    document.addEventListener("click", handleClick, true);
+    highlightEnabled = true;
+    overlay.style.display = "block";
+  }
+
+  // 禁用高亮功能
+  function disableHighlight() {
+    console.log("Disabling highlight");
+    highlightEnabled = false;
+    // 保持事件监听器，但通过 highlightEnabled 变量控制行为
+    // 这样可以保留选中状态的显示
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    // 不隐藏 selectedBox 和 selectedLabel，保留选中状态
+  }
+
+  // 完全禁用高亮功能（移除所有监听器）
+  function fullyDisableHighlight() {
+    console.log("Fully disabling highlight");
+    highlightEnabled = false;
+    document.removeEventListener("mouseover", handleMouseOver, true);
+    document.removeEventListener("mouseout", handleMouseOut, true);
+    document.removeEventListener("click", handleClick, true);
+    overlay.style.display = "none";
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    selectedBox.style.display = "none";
+    selectedLabel.style.display = "none";
+  }
+
+  // 添加事件监听
+  enableHighlight();
+  window.addEventListener("message", handleParentMessage);
+
+  // 暴露全局函数供外部调用
+  window.__iframeHighlightControl = {
+    enable: enableHighlight,
+    disable: disableHighlight,
+    fullyDisable: fullyDisableHighlight,
+    isEnabled: function isEnabled() {
+      return highlightEnabled;
+    },
+    getSelectedElement: function getSelectedElement() {
+      return selectedElement;
+    },
+    updateSelected: updateSelectedHighlight,
+    // 通过消息发送开关控制
+    sendToggleMessage: function sendToggleMessage(enabled) {
+      window.parent.postMessage({
+        type: 'iframe-highlight-status',
+        enabled: enabled || highlightEnabled,
+        source: 'iframe-highlight-injector'
+      }, '*');
+    }
+  };
+
+  // 通知父窗口脚本已加载
+  try {
+    window.parent.postMessage({
+      type: "iframe-highlight-ready",
+      data: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now()
+      },
+      source: "iframe-highlight-injector"
+    }, "*");
+  } catch (error) {
+    console.warn("无法发送就绪消息到父窗口:", error);
+  }
+
+  // 清理函数
+  window.__iframeHighlightCleanup = function () {
+    fullyDisableHighlight();
+    window.removeEventListener("message", handleParentMessage);
+    if (overlay.parentElement) {
+      overlay.parentElement.removeChild(overlay);
+    }
+    delete window.__iframeHighlightInitialized;
+    delete window.__iframeHighlightCleanup;
+  };
+})();
+
+</script>
+</body>
+</html>
