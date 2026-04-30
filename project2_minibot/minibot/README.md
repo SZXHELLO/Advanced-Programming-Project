@@ -1,7 +1,6 @@
 # minibot
 
-<img src="E:\githubrepository\advanced_programming_projects\project2_minibot\minibot\photos\agent_profile.png" alt="agent_profile" style="zoom:100%;" />
-
+![agent_profile](https://github.com/SZXHELLO/Advanced-Programming-Project/raw/main/project2_minibot/minibot/photos/agent_profile.png?raw=true)
 
 ## 项目结构
 
@@ -223,9 +222,18 @@ pytest tests/test_minibot_facade.py
 
 ## 特色功能展示
 ### 1.多agents协作
+![agents_cooperation1](https://github.com/SZXHELLO/Advanced-Programming-Project/raw/main/project2_minibot/minibot/photos/agents_cooperation1.png?raw=true)
+
+![agents_cooperation1](https://github.com/SZXHELLO/Advanced-Programming-Project/raw/main/project2_minibot/minibot/photos/agents_cooperation2.png?raw=true)
 
 ### 2.ReAct过程显示输出
+![ReAct_loop](https://github.com/SZXHELLO/Advanced-Programming-Project/blob/main/project2_minibot/minibot/photos/ReAct_loop.png?raw=true)
 
 ### 3.QQ通讯与PPT制作
+![QQconnection&tools_calling](https://github.com/SZXHELLO/Advanced-Programming-Project/blob/main/project2_minibot/minibot/photos/QQconnection&tools_calling.png?raw=true)
+![file_receiving&PPT_making](https://github.com/SZXHELLO/Advanced-Programming-Project/blob/main/project2_minibot/minibot/photos/file_receiving&PPT_making.png?raw=true)
 
 ### 4.前端GUI操控
+![frontend1](https://github.com/SZXHELLO/Advanced-Programming-Project/blob/main/project2_minibot/minibot/photos/frontend1.png?raw=true)
+![frontend2](https://github.com/SZXHELLO/Advanced-Programming-Project/blob/main/project2_minibot/minibot/photos/frontend2.png?raw=true)
+![frontend3](https://github.com/SZXHELLO/Advanced-Programming-Project/blob/main/project2_minibot/minibot/photos/frontend3.png?raw=true)
