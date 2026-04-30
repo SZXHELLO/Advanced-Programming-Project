@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 import json
 import re
@@ -10,9 +11,11 @@ from typing import Any, Callable
 
 from loguru import logger
 
+from minibot.agent.react_prompt_template import build_react_prompt_from_template
 from minibot.agent.tools.registry import ToolRegistry
+from minibot.agent.tools.spawn import infer_subagent_responsibilities
 from minibot.providers.base import LLMProvider
-from minibot.utils.helpers import strip_think, truncate_text
+from minibot.utils.helpers import build_assistant_message, strip_think, truncate_text
 from minibot.utils.react_display import format_react_text
 
 # User-facing toggle phrases (exact match on stripped message).
@@ -140,6 +143,16 @@ REACT_STATE_CHANGE_TOOLS: frozenset[str] = frozenset(
     {"write_file", "edit_file", "delete_file", "notebook_edit", "exec"}
 )
 
+# Round-1 workspace "sniffing" tools that models often emit via DSML instead of
+# delegating when the user explicitly asked for subagent orchestration.
+_REACT_DELEGATION_SNOOP_ACTIONS: frozenset[str] = frozenset({"glob", "list_dir"})
+# Tools that satisfy the file-side-effect guard on ``Action: finish`` when the user
+# asked for workspace changes. ``spawn`` counts: the subagent performs writes; the
+# main loop must not be forced into spurious ``exec``/``delete_file`` after delegating.
+REACT_FINISH_SATISFYING_TOOLS: frozenset[str] = REACT_STATE_CHANGE_TOOLS | frozenset(
+    {"spawn"}
+)
+
 # How many times we reject a hallucinated finish before giving up and letting
 # the finish through. 2 is enough in practice (model almost always complies on
 # the first retry); higher values mostly waste tokens on a pathological model.
@@ -189,6 +202,37 @@ def detect_file_state_change_intent(text: str) -> bool:
         or bool(_FILE_EXT_RE.search(text))
     )
     return has_context
+
+
+_DELEGATION_HINTS: tuple[str, ...] = (
+    "spawn",
+    "subagent",
+    "sub-agent",
+    "子agent",
+    "子 agent",
+    "多agent",
+    "多 agent",
+    "main agent",
+)
+
+
+def detect_subagent_delegation_intent(text: str) -> bool:
+    """Heuristic: does text explicitly ask for subagent delegation/collaboration?"""
+    if not text:
+        return False
+    s = text.lower()
+    if any(h in s for h in _DELEGATION_HINTS):
+        return True
+    # Orchestration phrasing + "agent" / 智能体 (covers「指挥 news agent」「调度 writing agent」).
+    if "agent" in s or "智能体" in text:
+        if any(v in text for v in ("调度", "指挥", "委派", "安排", "协调", "支配")):
+            return True
+        if any(
+            v in s
+            for v in ("orchestrate", "delegate", "dispatch", "coordinate", "sub-task")
+        ):
+            return True
+    return False
 
 
 _DELETE_VERBS_ZH: tuple[str, ...] = ("删除", "移除", "清除", "清空")
@@ -245,6 +289,20 @@ def _extract_last_user_text(messages: list[dict[str, Any]]) -> str:
     return ""
 
 
+def _build_current_task_anchor(last_user_text: str) -> str:
+    """Create a strict per-turn anchor so the model focuses on latest user text."""
+    task = (last_user_text or "").strip()
+    if not task:
+        task = "（空）"
+    return (
+        "## Current task anchor (must follow)\n"
+        "The **only** task for this run is the latest user message below. "
+        "Do not answer any earlier question unless the latest message explicitly asks to revisit it.\n"
+        "本轮只允许回答下面这条“最新用户消息”；不要回答上一题。\n\n"
+        f"最新用户消息：\n{task}"
+    )
+
+
 _CN_NUM = ("零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十")
 
 
@@ -288,89 +346,214 @@ def _append_react_protocol(messages: list[dict[str, Any]], appendix: str) -> Non
 
 def build_react_appendix(tools: ToolRegistry) -> str:
     catalog = format_tool_catalog(tools.get_definitions())
-    return (
-        "**ReAct** = **Reasoning + Acting** (Thought / Action / Observation text protocol). "
-        "It is NOT the React.js / npm / frontend stack.\n\n"
-        "## Turn scope / 本轮范围 (mandatory)\n"
-        "The **last user message** in the thread is the **only** task you must satisfy in this run. "
-        "Older messages are background; do **not** merge unrelated past questions into the current answer.\n"
-        "在**本轮**的 `Action: finish` 里，只回答**当前最后一条用户消息**里的问题。"
-        "不要复述、不要再次输出上一轮已经给过的算式、数字、结论或全文，除非用户**明确要求**重复。\n"
-        "若当前问题与更早的话题无关，请**完全忽略**旧话题，Thought 里也不要再分析旧问题。\n"
-        "Your `Thought` must focus on the **latest** user text only; do not write \"用户问了多个问题\" "
-        "unless the latest message literally contains multiple distinct questions.\n\n"
-        "**Session rule (mandatory):** The user has **already enabled ReAct reasoning** in this chat. "
-        "You MUST NOT ask them to confirm \"React 应用 / 开发服务器\" vs \"推理 ReAct\". "
-        "Do NOT mention npm, package.json, create-react-app, Vite, webpack, or dev servers unless "
-        "the user explicitly asks for a frontend task. Do NOT read package.json to \"check React project\".\n\n"
-        "**Output rule:** The user-visible reply must come **only** from `Action: finish`. "
-        "Use tools only for computation / file / search steps; do not try to \"send a chat message\" "
-        "except via `finish` (the `message` tool is unavailable in this mode).\n\n"
-        "For arithmetic or short factual questions: use at most one or two tool rounds if needed, "
-        "then `Action: finish` with the concise answer in `Observation`. No lecturing about React.js.\n\n"
-        "## When to call a tool vs. when to finish directly (mandatory)\n"
-        "Split every request into one of two categories BEFORE you act:\n\n"
-        "**(A) Knowledge-only questions** — jokes, greetings, translation, summarization of the user's own text, "
-        "定义/解释类问题 where you already have the factual answer from your own knowledge: "
-        "do NOT call any tool. Respond in one step with `Action: finish`.\n"
-        "Never invent tool names (e.g. `tell_joke`, `generate_joke`), and never pipe an answer "
-        "through `web_search` / `web_fetch` when you can answer from your own knowledge.\n\n"
-        "**(B) Action / side-effectful / state-changing tasks** — create/modify/delete files, run code, "
-        "edit notebooks, browse the web for fresh information, spawn subagents, schedule crons, etc.: "
-        "you MUST actually call the matching tool (`write_file`, `edit_file`, `delete_file`, `exec`, `web_search`, …). "
-        "You have **full access** to the tools listed in the catalog below and they operate on the real "
-        "workspace — do **not** claim you \"lack permission\" or \"cannot create files\", and do **not** "
-        "emit a shell one-liner as the answer instead of calling the tool.\n"
-        "If the user says \"新建 xxx 文件 / 写入 / 修改 / 删除 / 运行\" or any imperative that changes state, "
-        "category (B) applies and `Action: finish` alone is not acceptable — you must invoke a tool first, "
-        "observe its result, and only then `Action: finish` to report success.\n\n"
-        "**Anti-hallucination rule (hard ban):** For file-system writes/edits/deletes you MUST NOT go "
-        "`Action: finish` on round 1 with an Observation like "
-        "『文件 \"xxx.txt\" 已创建 / 内容为 ... / 文件已创建于 workspace 目录』 "
-        "unless a prior round actually returned that result from `write_file` / `edit_file` / "
-        "`delete_file` / `notebook_edit` / `exec`. Fabricating a success Observation without having called the tool is "
-        "**lying** — the environment will detect it, reject your finish, and force you to call the tool "
-        "for real. The only way to satisfy 『创建/写入/删除/修改 文件』 is to run the matching tool and "
-        "then report its *real* return value.\n\n"
-        "Minimal example for a knowledge-only request (category A)::\n\n"
-        "    Thought: 讲一个程序员笑话，直接回答即可，无需工具。\n"
-        "    Action: finish\n"
-        "    Observation: \"为什么程序员分不清万圣节和圣诞节？因为 Oct 31 == Dec 25。\"\n\n"
-        "Minimal example for a write-file task (category B)::\n\n"
-        "    Thought: 用户要求在 workspace 新建 测试2.txt 并写入内容；这是状态改变任务，必须用 write_file。\n"
-        "    Action: write_file\n"
-        "    Observation: {\"path\": \"测试2.txt\", \"content\": \"第二次写入测试\"}\n"
-        "    (上一行是工具参数 JSON；工具真实执行后返回的 Observation 会替换此处。)\n"
-        "    # 收到真实 Observation 后的下一轮：\n"
-        "    Thought: 写入已成功，可以向用户报告。\n"
-        "    Action: finish\n"
-        "    Observation: \"已在 workspace 新建 测试2.txt 并写入『第二次写入测试』。\"\n\n"
-        "You are in **ReAct mode**. Do NOT rely on function-calling / tool APIs. "
-        "Each turn, output **only** plain text in this exact shape:\n\n"
-        "Thought: <your reasoning>\n"
-        "Action: <tool_name_only> OR Action: finish\n"
-        "  (Write **only** the function name in Action — no parentheses or JSON on this line.)\n"
-        "Observation: <first line: one JSON value — tool parameters object, or finish answer string/object>\n"
-        "<optional following lines: 事实对齐 — briefly align expected tool outcome or finish content with your Thought, "
-        "before the environment returns the real tool observation.>\n\n"
-        "Rules:\n"
-        "- For a tool call, `Action` is **only** the tool name from the catalog; put parameters as JSON on the "
-        "**first line** after `Observation:`.\n"
-        "- After that first JSON line, you may add free text lines that state how you align reasoning with the "
-        "planned action / expected observation (事实对齐).\n"
-        "- To finish, use `Action: finish` (or the synonyms `final_answer` / `final` / `answer` / `done`) "
-        "and put the user-visible answer on the **first line** of `Observation` as a JSON string or as "
-        "{\"answer\": \"...\"}. The loop terminates as soon as a valid finish step is parsed.\n"
-        "- Legacy `Action Input:` is still accepted if you forget `Observation:`.\n"
-        "- Do not wrap the whole reply in ```` ```json ```` (or any other) code fence.\n"
-        "- Do not emit a single JSON object like `{\"Thought\": ..., \"Action\": ..., \"Observation\": ...}`. "
-        "Use real line-prefixed labels (three separate lines).\n"
-        "- Prefer plain lines starting with `Thought:` / `Action:` / `Observation:` (column 0 after spaces). "
-        "If you wrap labels in `**bold**` (e.g. `**Action:**`) or inside a code fence, the runtime will "
-        "normalize them, but plain labels are more reliable.\n\n"
-        "## Available tools (JSON schemas)\n\n"
-        f"{catalog}\n"
+    return build_react_prompt_from_template(tool_list=catalog)
+
+
+_XML_REACT_POSITIONAL: dict[str, tuple[str, ...]] = {
+    "write_file": ("path", "content"),
+    "edit_file": ("path", "old_text", "new_text"),
+    "read_file": ("path",),
+    "delete_file": ("path",),
+    "list_dir": ("path",),
+    "glob": ("pattern", "path"),
+    "web_search": ("query",),
+    "web_fetch": ("url",),
+}
+
+
+def _looks_like_xml_react(text: str) -> bool:
+    low = text.lower()
+    return "<action>" in low or "<final_answer>" in low
+
+
+def _extract_xml_thought(text: str) -> str:
+    m = re.search(r"<thought>\s*(.*?)\s*</thought>", text, flags=re.DOTALL | re.IGNORECASE)
+    return m.group(1).strip() if m else ""
+
+
+def _ast_to_value(node: ast.expr) -> Any:
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.List):
+        return [_ast_to_value(e) for e in node.elts]
+    if isinstance(node, ast.Tuple):
+        return tuple(_ast_to_value(e) for e in node.elts)
+    if isinstance(node, ast.Dict):
+        out: dict[Any, Any] = {}
+        for k, v in zip(node.keys, node.values, strict=False):
+            if k is None:
+                continue
+            out[_ast_to_value(k)] = _ast_to_value(v)  # type: ignore[arg-type]
+        return out
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return -_ast_to_value(node.operand)  # type: ignore[arg-type]
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.UAdd):
+        return +_ast_to_value(node.operand)  # type: ignore[arg-type]
+    if isinstance(node, ast.JoinedStr):
+        parts: list[str] = []
+        for v in node.values:
+            if isinstance(v, ast.Constant) and isinstance(v.value, str):
+                parts.append(v.value)
+            elif isinstance(v, ast.FormattedValue):
+                parts.append(str(_ast_to_value(v.value)))
+            else:
+                parts.append("")
+        return "".join(parts)
+    raise ValueError(
+        f"不支持的表达式（请使用字面量或在 <action> 中使用关键字参数）: {type(node).__name__}"
     )
+
+
+def _merge_positional_tool_args(tool: str, args: list[Any]) -> dict[str, Any]:
+    if not args:
+        return {}
+    if len(args) == 1 and isinstance(args[0], dict):
+        return dict(args[0])
+    hint = _XML_REACT_POSITIONAL.get(tool)
+    if hint:
+        if len(args) > len(hint):
+            raise ValueError(
+                f"工具 {tool} 至多接受 {len(hint)} 个位置参数；请改用关键字参数。"
+            )
+        return {hint[i]: args[i] for i in range(len(args))}
+    if len(args) == 1 and isinstance(args[0], str):
+        return {"query": args[0]}
+    raise ValueError(f"工具 {tool} 请使用关键字参数，例如 {tool}(path=\"...\", content=\"...\")")
+
+
+def _parse_xml_action_invocation_lenient(body: str) -> tuple[str, Any]:
+    """Best-effort parser for malformed XML `<action>` calls.
+
+    Handles common model drift where `write_file(..., content="...")` contains
+    raw newlines inside quoted strings (invalid Python for `ast.parse`).
+    """
+    m = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([\s\S]*)\)\s*$", body)
+    if not m:
+        raise ValueError("无法解析 <action>")
+    name = m.group(1)
+    args_blob = m.group(2)
+
+    if _is_finish_action(name):
+        # finish("...") / finish(answer="...")
+        km = re.search(r'answer\s*=\s*"([\s\S]*)"\s*$', args_blob)
+        if km:
+            return "finish", km.group(1)
+        sm = re.search(r'^\s*"([\s\S]*)"\s*$', args_blob)
+        if sm:
+            return "finish", sm.group(1)
+        return "finish", args_blob.strip()
+
+    # Most common failing case in practice: write_file(path="...", content="...<multi-line>...")
+    path_m = re.search(r'path\s*=\s*"([^"]*)"', args_blob)
+    content_m = re.search(r'content\s*=\s*"([\s\S]*)"\s*$', args_blob)
+    if name == "write_file" and path_m and content_m:
+        return name, {"path": path_m.group(1), "content": content_m.group(1)}
+
+    # Generic fallback: capture simple key="value" pairs.
+    pairs = dict(re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"([^"]*)"', args_blob))
+    if pairs:
+        return name, pairs
+    raise ValueError("无法解析 <action> 参数")
+
+
+def _parse_xml_action_invocation(body: str) -> tuple[str, Any]:
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("空的 <action>")
+    if "(" not in body:
+        head = body.split(None, 1)[0].strip()
+        if _is_finish_action(head):
+            rest = body[len(head) :].strip()
+            return "finish", rest
+        if re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", body):
+            return body, {}
+        raise ValueError("无法解析 <action>")
+
+    try:
+        tree = ast.parse(body, mode="eval")
+    except SyntaxError as e:
+        try:
+            return _parse_xml_action_invocation_lenient(body)
+        except ValueError:
+            raise ValueError(str(e)) from e
+    expr = tree.body
+    if isinstance(expr, ast.Name):
+        if _is_finish_action(expr.id):
+            return "finish", ""
+        return expr.id, {}
+    if not isinstance(expr, ast.Call):
+        raise ValueError("<action> 必须是 工具名(...) 或 finish")
+
+    if not isinstance(expr.func, ast.Name):
+        raise ValueError("仅支持简单函数名作为工具名")
+    name = expr.func.id
+    if _is_finish_action(name):
+        if not expr.args and not expr.keywords:
+            return "finish", ""
+        if expr.keywords:
+            kw = {k.arg: _ast_to_value(k.value) for k in expr.keywords if k.arg}
+            if "answer" in kw:
+                return "finish", kw["answer"]
+            if len(kw) == 1:
+                return "finish", next(iter(kw.values()))
+        if expr.args:
+            return "finish", _ast_to_value(expr.args[0])
+        return "finish", ""
+
+    params: dict[str, Any] = {}
+    for kw in expr.keywords:
+        if kw.arg:
+            params[kw.arg] = _ast_to_value(kw.value)
+
+    pos = [_ast_to_value(a) for a in expr.args]
+    if pos:
+        merged = _merge_positional_tool_args(name, pos)
+        for k, v in merged.items():
+            params.setdefault(k, v)
+    return name, params
+
+
+def _try_convert_xml_react_to_line_protocol(text: str) -> str | None:
+    """Map XML-tagged ReAct (user template) onto Thought:/Action:/Observation: for the runtime."""
+    if not _looks_like_xml_react(text):
+        return None
+    fa = re.search(
+        r"<final_answer>\s*(.*?)\s*</final_answer>",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if fa:
+        thought = _extract_xml_thought(text)
+        ans = fa.group(1).strip()
+        obs = json.dumps(ans, ensure_ascii=False)
+        return f"Thought: {thought}\nAction: finish\nObservation: {obs}"
+
+    am = re.search(
+        r"<action>\s*(.*?)\s*</action>",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if not am:
+        return None
+    try:
+        tool_name, payload = _parse_xml_action_invocation(am.group(1).strip())
+    except ValueError as e:
+        logger.debug("ReAct XML <action> parse failed: {}", e)
+        return None
+
+    thought = _extract_xml_thought(text)
+    if tool_name == "finish":
+        obs_val: Any = payload
+        if isinstance(obs_val, str):
+            obs = json.dumps(obs_val, ensure_ascii=False)
+        else:
+            obs = json.dumps(obs_val, ensure_ascii=False)
+        return f"Thought: {thought}\nAction: finish\nObservation: {obs}"
+
+    if not isinstance(payload, dict):
+        payload = {} if payload is None else {"_": payload}
+    obs_line = json.dumps(payload, ensure_ascii=False)
+    return f"Thought: {thought}\nAction: {tool_name}\nObservation: {obs_line}"
 
 
 def inject_react_instructions(
@@ -401,6 +584,101 @@ def _strip_enclosing_code_fence(text: str) -> str:
     if m:
         return m.group(1).strip()
     return text
+
+
+_DSML_INVOKE_OPEN_RE = re.compile(
+    r"<[^>]*\binvoke\b[^>]*\bname\s*=\s*\"([^\"]+)\"[^>]*>",
+    re.IGNORECASE,
+)
+_DSML_PARAM_RE = re.compile(
+    r"<[^>]*\bparameter\b[^>]*\bname\s*=\s*\"([^\"]+)\"[^>]*>([^<]*)</[^>]*\bparameter\b[^>]*>",
+    re.IGNORECASE,
+)
+_DSML_INVOKE_CLOSE_RE = re.compile(r"</[^>]*\binvoke\b[^>]*>", re.IGNORECASE)
+
+# Declared before DSML helpers — used to avoid rewriting mixed ReAct+DSML replies.
+_REACT_LABEL_ANY_RE = re.compile(
+    r"^\s*(Thought|Action|Observation)\s*:", re.MULTILINE | re.IGNORECASE
+)
+_WINDOWS_ABS_PATH_RE = re.compile(r"[A-Za-z]:[\\/][^\n]*")
+_FILE_ARTIFACT_RE = re.compile(
+    r"\.(pptx|ppt|docx|xlsx|pdf|zip|json|md|txt|csv)\b",
+    re.IGNORECASE,
+)
+
+
+def _coerce_dsml_scalar(val: str) -> Any:
+    """Coerce DSML parameter text to bool / int / float when obvious, else str."""
+    v = (val or "").strip()
+    low = v.lower()
+    if low == "true":
+        return True
+    if low == "false":
+        return False
+    if low.isdigit() or (low.startswith("-") and low[1:].isdigit()):
+        try:
+            return int(v, 10)
+        except ValueError:
+            pass
+    try:
+        if "." in v:
+            return float(v)
+    except ValueError:
+        pass
+    return v
+
+
+def _extract_dsml_invokes(text: str) -> list[tuple[str, dict[str, Any]]]:
+    """Parse DeepSeek-style DSML ``invoke`` blocks into (tool_name, params dict)."""
+    out: list[tuple[str, dict[str, Any]]] = []
+    for m in _DSML_INVOKE_OPEN_RE.finditer(text):
+        name = (m.group(1) or "").strip()
+        if not name:
+            continue
+        rest = text[m.end() :]
+        close = _DSML_INVOKE_CLOSE_RE.search(rest)
+        chunk = rest[: close.start()] if close else rest
+        params: dict[str, Any] = {}
+        for pm in _DSML_PARAM_RE.finditer(chunk):
+            k = (pm.group(1) or "").strip()
+            if k:
+                params[k] = _coerce_dsml_scalar(pm.group(2) or "")
+        out.append((name, params))
+    return out
+
+
+def _convert_dsml_assistant_blob_to_react(raw: str) -> str | None:
+    """If *raw* is DSML tool markup without ReAct labels, synthesize one ReAct step.
+
+    Only the **first** invoke is converted per turn; extra invokes are ignored
+    (the model should issue one tool per ReAct round). See log debug for drops.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return None
+    if _REACT_LABEL_ANY_RE.search(s):
+        return None
+    low = s.lower()
+    if "invoke" not in low and "dsml" not in low:
+        return None
+    invokes = _extract_dsml_invokes(s)
+    if not invokes:
+        return None
+    if len(invokes) > 1:
+        logger.debug(
+            "ReAct: DSML contained {} invokes; using first only ({})",
+            len(invokes),
+            invokes[0][0],
+        )
+    tool_name, params = invokes[0]
+    thought = (
+        "模型输出了 DSML/类 function-calling 标记；已转换为 ReAct 协议单行工具调用。"
+    )
+    return (
+        f"Thought: {thought}\n"
+        f"Action: {tool_name}\n"
+        f"Observation: {json.dumps(params, ensure_ascii=False)}"
+    )
 
 
 def _try_unfold_react_json_object(text: str) -> str | None:
@@ -492,26 +770,36 @@ def preprocess_react_model_output(text: str) -> str:
 
     Handles (in order):
 
-    1. ``<think>``/``<thought>`` reasoning blocks (via :func:`strip_think`).
+    0. XML-tagged protocol from :mod:`minibot.agent.react_prompt_template` —
+       ``<thought>`` / ``<action>`` / ``<final_answer>`` mapped to
+       ``Thought:`` / ``Action:`` / ``Observation:`` (before stripping tags).
+    1. ``<think>``/``<thought>`` reasoning blocks (via :func:`strip_think`)
+       when not using the XML ReAct template.
     2. Whole-output Markdown code fences (```` ```json ... ``` ````).
     3. Whole-output JSON objects keyed by ``Thought`` / ``Action`` /
        ``Observation`` — unfolded back to canonical protocol lines.
     4. Per-line Markdown bold around labels (``**Thought:**`` …).
     """
-    raw = strip_think((text or "").strip())
+    raw = (text or "").strip()
+    if not raw:
+        return raw
+    xml_mapped = _try_convert_xml_react_to_line_protocol(raw)
+    if xml_mapped is not None:
+        raw = xml_mapped
+    elif not _looks_like_xml_react(raw):
+        raw = strip_think(raw)
     if not raw:
         return raw
     raw = _strip_enclosing_code_fence(raw)
     unfolded = _try_unfold_react_json_object(raw)
     if unfolded is not None:
         raw = unfolded
+    dsml = _convert_dsml_assistant_blob_to_react(raw)
+    if dsml is not None:
+        raw = dsml
     raw = normalize_react_markdown_headers(raw)
     return raw
 
-
-_REACT_LABEL_ANY_RE = re.compile(
-    r"^\s*(Thought|Action|Observation)\s*:", re.MULTILINE | re.IGNORECASE
-)
 
 # Sentinel used in ``parse_react_step`` error strings to signal that the model
 # emitted natural-language text with no ReAct labels at all. ``run_react_loop``
@@ -571,7 +859,31 @@ def _is_naked_plain_answer(text: str) -> bool:
     """True when the model emitted a non-empty reply with *no* ReAct labels."""
     if not text.strip():
         return False
+    if _looks_like_xml_react(text):
+        return False
     return _REACT_LABEL_ANY_RE.search(text) is None
+
+
+def _looks_like_completed_plain_answer(text: str) -> bool:
+    """Heuristic: plain text likely already answers completion status.
+
+    Used to avoid extra ReAct retry rounds that leave the CLI spinner active
+    when the model already returned a concrete completion message (for example,
+    a generated PPTX file path).
+    """
+    s = (text or "").strip()
+    if not s:
+        return False
+    low = s.lower()
+    has_done_cue = any(
+        cue in low
+        for cue in (
+            "已生成", "已经生成", "生成好了", "已完成", "完成了", "文件在",
+            "saved", "generated", "created", "done",
+        )
+    )
+    has_artifact = bool(_WINDOWS_ABS_PATH_RE.search(s)) or bool(_FILE_ARTIFACT_RE.search(s))
+    return has_done_cue and has_artifact
 
 
 def parse_react_step(
@@ -661,10 +973,18 @@ def _parse_observation_payload(blob: str) -> tuple[Any | None, str | None, str |
 
 def finalize_finish_payload(raw: Any) -> str:
     """Turn finish payload from Observation into user-visible text."""
+    if raw is None:
+        return "已完成当前轮处理。"
     if isinstance(raw, str):
-        return raw
+        text = raw.strip()
+        if text:
+            return raw
+        # Guard against empty `Action: finish` payloads. In delegation flows
+        # this previously surfaced an empty final answer placeholder.
+        return "已完成当前轮处理。"
     if isinstance(raw, dict) and "answer" in raw:
-        return str(raw["answer"])
+        ans = str(raw["answer"]).strip()
+        return ans or "已完成当前轮处理。"
     return json.dumps(raw, ensure_ascii=False)
 
 
@@ -771,13 +1091,17 @@ async def run_react_loop(
     consecutive_tool_errors = 0
     last_failing_tool: str | None = None
 
-    # State-change intent guardrail — see REACT_STATE_CHANGE_TOOLS docs.
-    # We compute intent once from the last user message in the thread (which
-    # is the "current task" per the ReAct appendix) and then reject a bogus
-    # Action: finish up to MAX_STATE_CHANGE_REJECTIONS times, forcing the model
-    # to actually call write_file / edit_file / notebook_edit / exec.
+    # State-change intent guardrail — see REACT_STATE_CHANGE_TOOLS and
+    # REACT_FINISH_SATISFYING_TOOLS. We compute intent once from the last user
+    # message in the thread (which is the "current task" per the ReAct appendix)
+    # and then reject a bogus Action: finish up to MAX_STATE_CHANGE_REJECTIONS
+    # times, forcing the model to actually call write_file / edit_file /
+    # notebook_edit / exec, or ``spawn`` when delegating to a subagent.
     _last_user_text = _extract_last_user_text(initial_messages)
+    _current_task_anchor = _build_current_task_anchor(_last_user_text)
+    messages.append({"role": "user", "content": _current_task_anchor})
     state_change_intent = detect_file_state_change_intent(_last_user_text)
+    delegation_intent = detect_subagent_delegation_intent(_last_user_text)
     # Only enforce when at least one state-change tool is actually available.
     state_change_enforceable = state_change_intent and any(
         react_tools.has(name) for name in REACT_STATE_CHANGE_TOOLS
@@ -847,12 +1171,39 @@ async def run_react_loop(
                 react_trace=trace,
             )
 
-        raw_text = strip_think(response.content or "") or ""
+        raw_text = (response.content or "").strip()
         if response.has_tool_calls:
             logger.warning("ReAct: model returned tool_calls despite tools=None; using text only")
 
-        _, action, payload, alignment_text, perr = parse_react_step(raw_text)
-        header = f"{cycle_title(round_idx)}\n{raw_text.strip()}\n"
+        thought, action, payload, alignment_text, perr = parse_react_step(raw_text)
+        effective_raw = raw_text
+        if (
+            not perr
+            and delegation_intent
+            and round_idx == 1
+            and action in _REACT_DELEGATION_SNOOP_ACTIONS
+        ):
+            sniff_action = action
+            spawn_payload = {
+                "task": (_last_user_text or "").strip()
+                or "Complete the delegated multi-agent work as described.",
+                "label": "orchestration",
+            }
+            upgraded = (
+                "Thought: 用户要求指挥或调度子 agent；使用 spawn 委派完整任务，"
+                "而不是仅做 workspace 目录浏览。\n"
+                f"Action: spawn\n"
+                f"Observation: {json.dumps(spawn_payload, ensure_ascii=False)}"
+            )
+            t2, a2, p2, al2, e2 = parse_react_step(upgraded)
+            if not e2:
+                thought, action, payload, alignment_text, perr = t2, a2, p2, al2, e2
+                effective_raw = upgraded
+                logger.info(
+                    "ReAct: upgraded round-1 tool '{}' to spawn (delegation intent)",
+                    sniff_action,
+                )
+        header = f"{cycle_title(round_idx)}\n{effective_raw.strip()}\n"
         if use_llm_stream and on_stream_end is not None:
             if perr or action != "finish":
                 await _maybe_stream_end(resuming=True)
@@ -871,7 +1222,14 @@ async def run_react_loop(
         if alignment_text:
             transcript_parts.append(f"事实对齐: {alignment_text}\n")
 
-        messages.append({"role": "assistant", "content": raw_text})
+        # 思考模式 API 要求：带 reasoning 的 assistant 轮次必须在后续请求中原样带回 reasoning_content
+        messages.append(
+            build_assistant_message(
+                effective_raw,
+                reasoning_content=response.reasoning_content,
+                thinking_blocks=response.thinking_blocks,
+            )
+        )
 
         if perr:
             consecutive_parse_errors += 1
@@ -902,12 +1260,60 @@ async def run_react_loop(
             if perr == NAKED_PLAIN_TEXT_ERROR:
                 naked_plain_text_streak += 1
                 last_naked_plain_text = raw_text.strip()
+                # Fast-path: when the naked plain text already looks like a
+                # concrete completion reply (e.g. includes output file path),
+                # accept it immediately as finish to prevent "looks done but
+                # keeps thinking" UX in CLI ReAct mode.
+                if (
+                    _looks_like_completed_plain_answer(last_naked_plain_text)
+                    and not state_change_enforceable
+                    and (
+                        not delegation_intent
+                        or any(t in REACT_FINISH_SATISFYING_TOOLS for t in tools_used)
+                    )
+                ):
+                    synthesized_thought = (
+                        "模型未按 ReAct 三段协议输出；检测到已完成并包含产物信息，"
+                        "将该自然语言回复直接作为最终答案。"
+                    )
+                    answer = last_naked_plain_text
+                    obs_json = json.dumps(answer, ensure_ascii=False)
+                    synthesized = (
+                        f"Thought: {synthesized_thought}\n"
+                        f"Action: finish\n"
+                        f"Observation: {obs_json}\n"
+                    )
+                    if emit_round_progress:
+                        await _emit_progress(
+                            progress_callback,
+                            format_react_text(synthesized),
+                        )
+                    transcript_parts.append(synthesized)
+                    tail = "\n\n".join(transcript_parts).rstrip()
+                    full_trace = f"{tail}\n\n最终答案：\n{answer}".strip()
+                    logger.debug("ReAct trace (completion-like implicit finish):\n{}", full_trace)
+                    return ReactRunResult(
+                        final_content=answer.strip(),
+                        messages=messages,
+                        tools_used=tools_used,
+                        stop_reason="completed",
+                        usage=usage,
+                        react_trace=full_trace,
+                    )
                 # Second consecutive refusal to follow the protocol: accept the
                 # plain-text answer as an implicit finish so the user isn't
                 # stuck in an endless retry loop. The single-round case still
                 # retries so the three-section protocol remains visible when
                 # the model is capable of following instructions.
-                if naked_plain_text_streak >= 2 and last_naked_plain_text:
+                if (
+                    naked_plain_text_streak >= 2
+                    and last_naked_plain_text
+                    and not state_change_enforceable
+                    and (
+                        not delegation_intent
+                        or any(t in REACT_FINISH_SATISFYING_TOOLS for t in tools_used)
+                    )
+                ):
                     synthesized_thought = (
                         "模型未按 ReAct 三段协议输出；将上一条自然语言回复直接作为最终答案。"
                     )
@@ -939,11 +1345,12 @@ async def run_react_loop(
                     "Observation: 你的上一条回复没有使用 ReAct 三段协议。"
                     "必须严格以下格式重答（每段单独一行，不要加代码围栏、不要用 JSON 对象包裹、不要加 Markdown 粗体）：\n"
                     "Thought: <一句话说明你要做什么>\n"
-                    "Action: finish\n"
-                    "Observation: \"<直接给出最终答案文本>\"\n"
+                    f"Action: {'spawn' if (delegation_intent and not any(t in REACT_FINISH_SATISFYING_TOOLS for t in tools_used)) else 'finish'}\n"
+                    f"Observation: {'{\"task\": \"<委派给子agent的任务说明>\"}' if (delegation_intent and not any(t in REACT_FINISH_SATISFYING_TOOLS for t in tools_used)) else '\"<直接给出最终答案文本>\"'}\n"
                     "简单问题（讲笑话、问候、翻译、定义/解释）必须用 Action: finish 一步完成，"
                     "禁止调用工具，禁止自创 tell_joke/generate_joke 这类不存在的工具名，"
-                    "禁止用 web_search 传答案。现在请立即按上述格式重新回答用户的原始问题。"
+                    "禁止用 web_search 传答案。现在请立即按上述格式重新回答下面这条最新用户消息，不要回答上一题：\n"
+                    f"{(_last_user_text or '').strip()}"
                 )
             else:
                 naked_plain_text_streak = 0
@@ -968,7 +1375,7 @@ async def run_react_loop(
             if (
                 state_change_enforceable
                 and state_change_rejections < MAX_STATE_CHANGE_REJECTIONS
-                and not any(t in REACT_STATE_CHANGE_TOOLS for t in tools_used)
+                and not any(t in REACT_FINISH_SATISFYING_TOOLS for t in tools_used)
             ):
                 state_change_rejections += 1
                 available = [
@@ -1056,6 +1463,31 @@ async def run_react_loop(
                 # the tool_error_limit guard.
                 if obs_text.lstrip().startswith("Error"):
                     tool_error = True
+                elif action == "spawn" and not tool_error:
+                    task_text = ""
+                    if isinstance(params, dict):
+                        task_text = str(
+                            params.get("task")
+                            or params.get("command")
+                            or ""
+                        )
+                    roles = infer_subagent_responsibilities(task_text)
+                    action_plan = (
+                        "Action: spawn\n"
+                        f"创建子agent: {params.get('label') if isinstance(params, dict) and params.get('label') else roles[0]}\n"
+                        f"职责分工: {', '.join(roles)}"
+                    )
+                    if emit_round_progress:
+                        await _emit_progress(
+                            progress_callback,
+                            format_react_text(action_plan) + "\n",
+                        )
+                    transcript_parts.append(action_plan + "\n")
+                    obs_text = (
+                        obs_text
+                        + "\n\n[Runtime] 子智能体已在后台运行。若用户请求多个子任务/多个子agent，可继续按计划 spawn；"
+                        "全部委派完成后再 Action: finish。不要执行与当前用户请求无关的 delete/exec。"
+                    )
 
         obs_text = truncate_text(obs_text, max_tool_result_chars)
         obs = f"Observation: {obs_text}"

@@ -17,6 +17,7 @@ from minibot.agent.autocompact import AutoCompact
 from minibot.agent.context import ContextBuilder
 from minibot.agent.hook import AgentHook, AgentHookContext, CompositeHook
 from minibot.agent.memory import Consolidator, Dream
+from minibot.agent.react_prompt_template import build_react_prompt_from_template
 from minibot.agent.react_loop import (
     detect_react_toggle,
     run_react_loop,
@@ -38,6 +39,7 @@ from minibot.agent.tools.registry import ToolRegistry
 from minibot.agent.tools.search import GlobTool, GrepTool
 from minibot.agent.tools.shell import ExecTool
 from minibot.agent.tools.spawn import SpawnTool
+from minibot.agent.tools.subagent_roster import SubagentRosterTool
 from minibot.agent.tools.web import WebFetchTool, WebSearchTool
 from minibot.bus.events import InboundMessage, OutboundMessage
 from minibot.bus.queue import MessageBus
@@ -333,6 +335,7 @@ class AgentLoop:
             self.tools.register(WebFetchTool(proxy=self.web_config.proxy))
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))
+        self.tools.register(SubagentRosterTool(manager=self.subagents))
         if self.cron_service:
             self.tools.register(
                 CronTool(self.cron_service, default_timezone=self.context.timezone or "UTC")
@@ -377,10 +380,10 @@ class AgentLoop:
         """Update context for all tools that need routing info."""
         route = getattr(self, "_routing_session_key", None)
         spawn_route = route if route is not None else f"{channel}:{chat_id}"
-        for name in ("message", "spawn", "cron"):
+        for name in ("message", "spawn", "cron", "subagent_roster"):
             if tool := self.tools.get(name):
                 if hasattr(tool, "set_context"):
-                    if name == "spawn":
+                    if name in ("spawn", "subagent_roster"):
                         tool.set_context(channel, chat_id, routing_session_key=spawn_route)
                     elif name == "message":
                         tool.set_context(channel, chat_id, message_id)
@@ -402,6 +405,45 @@ class AgentLoop:
         from minibot.utils.tool_hints import format_tool_hints
 
         return format_tool_hints(tool_calls)
+
+    def _format_tools_for_react(self) -> str:
+        """Serialize registered tools for template substitution."""
+        defs = self.tools.get_definitions()
+        if not defs:
+            return "[]"
+        try:
+            return json.dumps(defs, ensure_ascii=False, indent=2)
+        except TypeError:
+            # Fallback: some plugin tool definitions may contain non-serializable values.
+            return "\n\n".join(str(d) for d in defs)
+
+    def _apply_react_template(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Inject external ReAct template text into the first system message.
+
+        This is a utility for callers that want pre-baked ReAct system text in
+        ``initial_messages``. The main ReAct runtime still performs its own
+        protocol injection in ``minibot.agent.react_loop``.
+        """
+        tool_list = self._format_tools_for_react()
+        react_system = build_react_prompt_from_template(
+            tool_list=tool_list,
+            workspace_root=self.workspace,
+        )
+
+        out = [dict(m) for m in messages]
+        for i, m in enumerate(out):
+            if m.get("role") != "system":
+                continue
+            c = m.get("content")
+            if isinstance(c, str):
+                out[i] = {**m, "content": react_system}
+            elif isinstance(c, list):
+                out[i] = {**m, "content": [{"type": "text", "text": react_system}]}
+            else:
+                out[i] = {**m, "content": react_system}
+            return out
+        out.insert(0, {"role": "system", "content": react_system})
+        return out
 
     def _effective_session_key(self, msg: InboundMessage) -> str:
         """Return the session key used for task routing and mid-turn injections."""
@@ -533,6 +575,7 @@ class AgentLoop:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
         self._running = True
         await self._connect_mcp()
+        await self.subagents.ensure_resumed()
         logger.info("Agent loop started")
 
         while self._running:
@@ -835,7 +878,7 @@ class AgentLoop:
         )
         if not use_react:
             initial_messages = _append_plain_mode_hint_to_system(initial_messages)
-
+        
         async def _bus_progress(
             content: str,
             *,
@@ -846,8 +889,12 @@ class AgentLoop:
             meta = dict(msg.metadata or {})
             meta["_progress"] = True
             meta["_tool_hint"] = tool_hint
-            if agent_role:
-                meta["_agent_role"] = agent_role
+            # Do not force a default "main agent" role for all ReAct progress
+            # lines; it pollutes protocol text like "Observation: ...".
+            # Keep role labels only when explicitly provided (e.g. subagent orchestration).
+            eff_role = agent_role
+            if eff_role:
+                meta["_agent_role"] = eff_role
             if subagent_label:
                 meta["_subagent_label"] = subagent_label
             await self.bus.publish_outbound(
@@ -1134,6 +1181,7 @@ class AgentLoop:
     ) -> OutboundMessage | None:
         """Process a message directly and return the outbound payload."""
         await self._connect_mcp()
+        await self.subagents.ensure_resumed()
         default_key = f"{channel}:{chat_id}"
         msg = InboundMessage(
             channel=channel, sender_id="user", chat_id=chat_id,

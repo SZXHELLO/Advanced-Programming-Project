@@ -18,10 +18,12 @@ from minibot.agent.react_loop import (
     REACT_TOGGLE_ON_PHRASES,
     cycle_title,
     detect_react_toggle,
+    detect_subagent_delegation_intent,
     finalize_finish_payload,
     normalize_react_markdown_headers,
     normalize_tool_params,
     parse_react_step,
+    preprocess_react_model_output,
 )
 
 
@@ -79,6 +81,36 @@ class TestDetectReactToggle:
 
     def test_returns_none_when_verb_conflict(self) -> None:
         assert detect_react_toggle("开启还是关闭react推理循环模式") is None
+
+
+class TestDelegationIntent:
+    def test_orchestration_zh_with_agent_names(self) -> None:
+        msg = "请你指挥调度`news agent`与`writing agent`完成收集并整理新闻的工作"
+        assert detect_subagent_delegation_intent(msg) is True
+
+    def test_dispatch_zh(self) -> None:
+        assert detect_subagent_delegation_intent("请调度 subagent 分析日志") is True
+
+    def test_unrelated_no_false_positive(self) -> None:
+        assert detect_subagent_delegation_intent("今天新闻里提到了 agent 模型") is False
+
+
+def test_preprocess_converts_dsml_invoke_to_react() -> None:
+    dsml = (
+        "<｜DSML｜tool_calls>\n"
+        "<｜DSML｜invoke name=\"glob\">\n"
+        '<｜DSML｜parameter name="pattern" string="true">**/*news*</｜DSML｜parameter>\n'
+        '<｜DSML｜parameter name="path" string="true">.</｜DSML｜parameter>\n'
+        '<｜DSML｜parameter name="entry_type" string="true">files</｜DSML｜parameter>\n'
+        "</｜DSML｜invoke>\n"
+        "</｜DSML｜tool_calls>"
+    )
+    normalized = preprocess_react_model_output(dsml)
+    thought, action, inp, align, err = parse_react_step(normalized)
+    assert err is None
+    assert action == "glob"
+    assert inp == {"pattern": "**/*news*", "path": ".", "entry_type": "files"}
+    assert align is None
 
 
 def _wire_react_provider(provider: MagicMock, chat_impl) -> None:
@@ -332,6 +364,35 @@ class _NoopTool(Tool):
 
     async def execute(self, **kwargs: Any) -> Any:
         return "observed"
+
+
+class _FakeSpawnTool(Tool):
+    """Stand-in for spawn in delegation / DSML upgrade tests."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    @property
+    def name(self) -> str:
+        return "spawn"
+
+    @property
+    def description(self) -> str:
+        return "fake spawn"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string"},
+                "label": {"type": "string"},
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> Any:
+        self.calls.append(dict(kwargs))
+        return "Subagent started (fake)"
 
 
 class _FakeWriteFileTool(Tool):
@@ -647,6 +708,133 @@ async def test_run_react_loop_naked_text_retry_then_complies() -> None:
     assert "Action: finish" in result.react_trace
 
 
+@pytest.mark.asyncio
+async def test_run_react_loop_delegation_intent_does_not_implicit_finish_on_naked_text() -> None:
+    """When user explicitly asks for spawn/subagent collaboration, two naked-text
+    rounds must NOT trigger implicit finish. The loop should keep correcting
+    until a compliant ReAct step arrives."""
+    from minibot.agent.react_loop import run_react_loop
+
+    provider = MagicMock()
+    n = {"c": 0}
+
+    async def chat_impl(*, messages, tools=None, **kwargs):
+        n["c"] += 1
+        if n["c"] == 1:
+            return LLMResponse(content="先给一个普通段落，不含ReAct标签", tool_calls=[], usage={})
+        if n["c"] == 2:
+            return LLMResponse(content="第二次依然不按协议输出", tool_calls=[], usage={})
+        return LLMResponse(
+            content='Thought: 需要先委派\nAction: finish\nObservation: "已按协议输出"',
+            tool_calls=[],
+            usage={},
+        )
+
+    _wire_react_provider(provider, chat_impl)
+    reg = ToolRegistry()
+    reg.register(_NoopTool())
+
+    result = await run_react_loop(
+        provider=provider,
+        tools=reg,
+        initial_messages=[{"role": "user", "content": "请用spawn做多agent协作，安排子agent分工"}],
+        model="m",
+        max_iterations=5,
+        max_tool_result_chars=500,
+        provider_retry_mode="standard",
+    )
+    assert result.stop_reason == "completed"
+    assert result.final_content == "已按协议输出"
+    assert n["c"] == 3
+
+
+@pytest.mark.asyncio
+async def test_run_react_loop_naked_completed_plain_answer_finishes_immediately() -> None:
+    """A naked plain-text completion with artifact path should stop immediately.
+
+    Regression: avoid extra retry rounds that leave CLI in a lingering
+    "thinking" state even though the model already gave a concrete file result.
+    """
+    from minibot.agent.react_loop import run_react_loop
+
+    provider = MagicMock()
+    n = {"c": 0}
+
+    async def chat_impl(*, messages, tools=None, **kwargs):
+        n["c"] += 1
+        return LLMResponse(
+            content=(
+                "天津旅游攻略.pptx 已经在上次生成好了，文件在工作区根目录：\n"
+                "C:\\Users\\25283\\.minibot\\workspace\\天津旅游攻略.pptx"
+            ),
+            tool_calls=[],
+            usage={},
+        )
+
+    _wire_react_provider(provider, chat_impl)
+    reg = ToolRegistry()
+    reg.register(_NoopTool())
+
+    result = await run_react_loop(
+        provider=provider,
+        tools=reg,
+        initial_messages=[{"role": "user", "content": "你把ppt保存在哪里"}],
+        model="m",
+        max_iterations=5,
+        max_tool_result_chars=500,
+        provider_retry_mode="standard",
+    )
+    assert result.stop_reason == "completed"
+    assert "天津旅游攻略.pptx" in (result.final_content or "")
+    assert n["c"] == 1
+
+
+@pytest.mark.asyncio
+async def test_run_react_loop_delegation_upgrades_round1_glob_to_spawn() -> None:
+    """DSML glob on round 1 + delegation intent should run spawn with the user task."""
+    from minibot.agent.react_loop import run_react_loop
+
+    provider = MagicMock()
+    n = {"c": 0}
+    dsml = (
+        "<｜DSML｜tool_calls>\n"
+        "<｜DSML｜invoke name=\"glob\">\n"
+        '<｜DSML｜parameter name="pattern" string="true">*.md</｜DSML｜parameter>\n'
+        "</｜DSML｜invoke>\n"
+        "</｜DSML｜tool_calls>"
+    )
+
+    async def chat_impl(*, messages, tools=None, **kwargs):
+        n["c"] += 1
+        if n["c"] == 1:
+            return LLMResponse(content=dsml, tool_calls=[], usage={})
+        return LLMResponse(
+            content='Thought: done\nAction: finish\nObservation: "ok"',
+            tool_calls=[],
+            usage={},
+        )
+
+    _wire_react_provider(provider, chat_impl)
+    reg = ToolRegistry()
+    st = _FakeSpawnTool()
+    reg.register(st)
+
+    user = "请你指挥调度`news agent`完成新闻收集"
+    result = await run_react_loop(
+        provider=provider,
+        tools=reg,
+        initial_messages=[{"role": "user", "content": user}],
+        model="m",
+        max_iterations=5,
+        max_tool_result_chars=500,
+        provider_retry_mode="standard",
+    )
+    assert result.stop_reason == "completed"
+    assert result.final_content == "ok"
+    assert st.calls
+    assert "news" in (st.calls[0].get("task") or "")
+
+
 def test_build_react_appendix_requires_tool_for_state_changing_tasks() -> None:
     """Regression guard: the appendix must make it unambiguous that write/
     edit/delete/exec-style requests are category (B) and must invoke the
@@ -667,6 +855,50 @@ def test_build_react_appendix_requires_tool_for_state_changing_tasks() -> None:
     assert "shell one-liner" in appendix or "one-liner" in appendix
     # And the positive example for a write-file task.
     assert "测试2.txt" in appendix or "write_file" in appendix
+
+
+def test_xml_react_action_maps_to_line_protocol() -> None:
+    xml = (
+        "<thought>写入文件</thought>\n"
+        '<action>write_file(path="a.txt", content="x")</action>'
+    )
+    out = preprocess_react_model_output(xml)
+    _, action, inp, _, err = parse_react_step(out)
+    assert err is None
+    assert action == "write_file"
+    assert inp == {"path": "a.txt", "content": "x"}
+
+
+def test_xml_react_final_answer_finishes() -> None:
+    xml = "<thought>完成</thought>\n<final_answer>hello</final_answer>"
+    out = preprocess_react_model_output(xml)
+    _, action, inp, _, err = parse_react_step(out)
+    assert err is None
+    assert action == "finish"
+    assert finalize_finish_payload(inp) == "hello"
+
+
+def test_xml_react_action_write_file_multiline_content_lenient_parse() -> None:
+    xml = (
+        "<thought>写入多行文件</thought>\n"
+        "<action>write_file(path=\"C:/tmp/index.html\", content=\"<!DOCTYPE html>\n"
+        "<html>\n<body>ok</body>\n</html>\")</action>"
+    )
+    out = preprocess_react_model_output(xml)
+    _, action, inp, _, err = parse_react_step(out)
+    assert err is None
+    assert action == "write_file"
+    assert isinstance(inp, dict)
+    assert inp.get("path") == "C:/tmp/index.html"
+    assert "<html>" in str(inp.get("content", ""))
+
+
+def test_line_protocol_still_works_when_no_xml_tags() -> None:
+    text = 'Thought: t\nAction: finish\nObservation: "ok"'
+    out = preprocess_react_model_output(text)
+    _, action, _, _, err = parse_react_step(out)
+    assert err is None
+    assert action == "finish"
 
 
 def test_parse_react_final_answer_alias_accepted() -> None:

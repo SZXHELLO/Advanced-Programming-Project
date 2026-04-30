@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from minibot.agent.tools.shell import ExecTool
+from minibot.agent.tools.shell import ExecTool, merge_subagent_exec_allowed_commands
 
 
 def _fake_resolve_private(hostname, port, family=0, type_=0):
@@ -241,3 +241,36 @@ def test_exec_structural_validation_handles_redirects():
     result = tool._guard_command("echo bad > out.txt", "/tmp")
     assert result is not None
     assert "failed validation against allowed patterns" in result
+
+
+def test_exec_whitelist_mode_does_not_require_allow_patterns_match() -> None:
+    """allowed_commands is strict enough; do not double-gate with allow_patterns."""
+    tool = ExecTool(allowed_commands={"Get-Content": []})
+    assert tool._guard_command("Get-Content foo.txt", "/tmp") is None
+
+
+def test_merge_subagent_exec_allowed_commands_extends_user_map() -> None:
+    merged = merge_subagent_exec_allowed_commands({"ls": []})
+    assert merged is not None
+    assert merged["ls"] == []
+    assert "Get-Content" in merged
+    assert merged["Get-Content"] == []
+
+
+def test_merge_subagent_keeps_user_powershell_entry() -> None:
+    merged = merge_subagent_exec_allowed_commands(
+        {"powershell": [r"^custom$"], "ls": []},
+    )
+    assert merged is not None
+    assert merged["powershell"] == [r"^custom$"]
+
+
+def test_exec_merged_whitelist_allows_powershell_get_content() -> None:
+    tool = ExecTool(
+        allowed_commands=merge_subagent_exec_allowed_commands({"echo": []}),
+    )
+    err = tool._guard_command(
+        'powershell -NoProfile -Command "Get-Content -Raw .\\README.md"',
+        "/tmp",
+    )
+    assert err is None

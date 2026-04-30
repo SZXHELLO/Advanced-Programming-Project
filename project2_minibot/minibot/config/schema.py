@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
 
@@ -14,6 +14,70 @@ class Base(BaseModel):
     """Base model that accepts both camelCase and snake_case keys."""
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+def _normalize_webhook_path(value: str) -> str:
+    """Shared path normalizer for OneBot webhook-style channels."""
+    if not value:
+        return "/"
+    if not value.startswith("/"):
+        value = "/" + value
+    if len(value) > 1 and value.endswith("/"):
+        return value.rstrip("/")
+    return value
+
+
+class QQCollectorConfig(Base):
+    """Configuration for QQ @mention markdown collector channel."""
+
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 8081
+    path: str = "/qq/collector"
+    secret: str = ""
+    allow_from: list[str] = Field(default_factory=lambda: ["*"])
+    allow_groups: list[str] = Field(default_factory=list)
+    match_at_all: bool = True
+    match_at_me: bool = True
+    # Extra display names to treat as @me when NapCat delivers a literal "@<name>"
+    # text segment instead of a real at-segment (common when users type "@" manually).
+    # The bot's own self_id and (when auto_fetch_bot_name is on) the nickname and
+    # per-group card fetched from NapCat are always matched as well. Case-sensitive.
+    text_mention_aliases: list[str] = Field(default_factory=list)
+    # OneBot HTTP API endpoint used to auto-discover the bot's nickname and
+    # per-group card at runtime. Leave as default when NapCat is local.
+    api_base: str = "http://127.0.0.1:5700"
+    access_token: str = ""
+    # When True, the collector will call `get_login_info` at startup and
+    # `get_group_member_info` on first event per group to extend the @me alias
+    # set automatically.
+    auto_fetch_bot_name: bool = True
+    output_dir: str = ""
+    include_plain_group_msgs: bool = False
+
+    @field_validator("path")
+    @classmethod
+    def normalize_path(cls, value: str) -> str:
+        return _normalize_webhook_path(value)
+
+
+class QQWebhookConfig(Base):
+    """go-cqhttp / NapCat reverse HTTP webhook channel configuration."""
+
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 8080
+    path: str = "/qq/webhook"
+    secret: str = ""
+    api_base: str = "http://127.0.0.1:5700"
+    access_token: str = ""
+    allow_from: list[str] = Field(default_factory=lambda: ["*"])
+
+    @field_validator("path")
+    @classmethod
+    def normalize_path(cls, value: str) -> str:
+        return _normalize_webhook_path(value)
+
 
 class ChannelsConfig(Base):
     """Configuration for chat channels.
@@ -29,6 +93,8 @@ class ChannelsConfig(Base):
     send_tool_hints: bool = False  # stream tool-call hints (e.g. read_file("…"))
     send_max_retries: int = Field(default=3, ge=0, le=10)  # Max delivery attempts (initial send included)
     transcription_provider: str = "groq"  # Voice transcription backend: "groq" or "openai"
+    qq_collector: QQCollectorConfig = Field(default_factory=QQCollectorConfig)
+    qq_webhook: QQWebhookConfig = Field(default_factory=QQWebhookConfig)
 
 
 class DreamConfig(Base):

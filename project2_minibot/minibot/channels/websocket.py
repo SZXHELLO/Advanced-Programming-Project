@@ -428,6 +428,11 @@ class WebSocketChannel(BaseChannel):
             "event": "message",
             "text": msg.content,
         }
+        meta = msg.metadata or {}
+        if meta.get("_progress"):
+            payload["kind"] = "progress"
+        if meta.get("_tool_hint"):
+            payload["toolHint"] = True
         if msg.media:
             payload["media"] = msg.media
         if msg.reply_to:

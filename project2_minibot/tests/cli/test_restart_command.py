@@ -28,6 +28,8 @@ def _make_loop():
          patch("minibot.agent.loop.SessionManager"), \
          patch("minibot.agent.loop.SubagentManager"):
         loop = AgentLoop(bus=bus, provider=provider, workspace=workspace)
+    # AgentLoop calls await subagents.ensure_resumed() from run() / process_direct()
+    loop.subagents.ensure_resumed = AsyncMock()
     return loop, bus
 
 

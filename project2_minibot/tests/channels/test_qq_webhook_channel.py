@@ -36,13 +36,25 @@ def test_verify_gocqhttp_signature_accepts_valid_and_rejects_invalid() -> None:
 
 
 def test_format_message_content_supports_segments() -> None:
+    # at-segment without an explicit `name` falls back to the QQ number so the
+    # rendered text still identifies the mentioned user (rather than a bare '@').
     message = [
         {"type": "text", "data": {"text": "hello"}},
         {"type": "at", "data": {"qq": "123"}},
         {"type": "image", "data": {"file": "x.png"}},
         {"type": "text", "data": {"text": " world"}},
     ]
-    assert _format_message_content(message, "") == "hello@[image] world"
+    assert _format_message_content(message, "") == "hello@123[image] world"
+
+
+def test_format_message_content_at_segment_prefers_name_and_handles_all() -> None:
+    # An explicit display name wins over the raw QQ number.
+    named = [{"type": "at", "data": {"qq": "42", "name": "HelloAgent"}}]
+    assert _format_message_content(named, "") == "@HelloAgent"
+
+    # qq=="all" is rendered with the conventional Chinese label.
+    all_msg = [{"type": "at", "data": {"qq": "all"}}]
+    assert _format_message_content(all_msg, "") == "@全体成员"
 
 
 def test_extract_inbound_message_private_and_group() -> None:
@@ -177,6 +189,50 @@ async def test_send_group_message_with_reply_and_media() -> None:
 
 
 @pytest.mark.asyncio
+async def test_send_raises_when_onebot_returns_nonzero_retcode() -> None:
+    channel = QQWebhookChannel(
+        {"enabled": True, "allowFrom": ["*"]},
+        MessageBus(),
+    )
+    fake_http = _FakeHttpSession()
+    fake_http.next_response = _FakeResponse(
+        status=200, text='{"status":"failed","retcode":1404,"wording":"bad"}'
+    )
+    channel._http = fake_http  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError, match="retcode"):
+        await channel.send(
+            OutboundMessage(
+                channel="qq_webhook",
+                chat_id="private:1001",
+                content="hello",
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_send_uses_message_id_from_metadata_when_reply_to_absent() -> None:
+    channel = QQWebhookChannel(
+        {"enabled": True, "allowFrom": ["*"], "apiBase": "http://127.0.0.1:5700"},
+        MessageBus(),
+    )
+    fake_http = _FakeHttpSession()
+    fake_http.next_response = _FakeResponse(status=200, text='{"status":"ok","retcode":0}')
+    channel._http = fake_http  # type: ignore[assignment]
+
+    await channel.send(
+        OutboundMessage(
+            channel="qq_webhook",
+            chat_id="group:2002",
+            content="hi",
+            metadata={"message_id": 999},
+        )
+    )
+    payload = fake_http.calls[0]["json"]
+    assert payload["message"].startswith("[CQ:reply,id=999]")
+
+
+@pytest.mark.asyncio
 async def test_send_raises_when_onebot_api_returns_error() -> None:
     channel = QQWebhookChannel(
         {
@@ -229,6 +285,8 @@ async def test_handle_webhook_forwards_valid_message() -> None:
     assert inbound.sender_id == "1001"
     assert inbound.chat_id == "private:1001"
     assert inbound.content == "hello"
+    assert inbound.metadata.get("message_id") == 7
+    assert inbound.metadata.get("qq_webhook", {}).get("message_id") == 7
 
 
 @pytest.mark.asyncio

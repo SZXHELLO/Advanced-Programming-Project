@@ -402,6 +402,43 @@ class OpenAICompatProvider(LLMProvider):
 
         return kwargs
 
+    @staticmethod
+    def _is_reasoning_roundtrip_error(exc: Exception) -> bool:
+        """Return True when provider rejects missing echoed reasoning_content.
+
+        Some thinking-mode gateways require prior assistant ``reasoning_content``
+        to be passed back verbatim on subsequent turns. Legacy histories may miss
+        that field and trigger an invalid_request-style error.
+        """
+        txt = str(getattr(exc, "body", None) or getattr(exc, "doc", None) or exc).lower()
+        return "reasoning_content" in txt and "must be passed back" in txt
+
+    @staticmethod
+    def _repair_messages_for_reasoning_roundtrip(
+        messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Drop plain assistant turns without reasoning_content.
+
+        Keep assistant turns with tool_calls (and their tool replies) untouched to
+        preserve tool-call pairing. This is a best-effort history repair path used
+        only after the provider explicitly reports reasoning-content roundtrip
+        violations.
+        """
+        repaired: list[dict[str, Any]] = []
+        for msg in messages:
+            if msg.get("role") != "assistant":
+                repaired.append(msg)
+                continue
+            if msg.get("tool_calls"):
+                repaired.append(msg)
+                continue
+            rc = msg.get("reasoning_content")
+            if isinstance(rc, str) and rc.strip():
+                repaired.append(msg)
+                continue
+            # Drop this assistant turn (legacy/no reasoning_content).
+        return repaired
+
     def _should_use_responses_api(
         self,
         model: str | None,
@@ -926,6 +963,33 @@ class OpenAICompatProvider(LLMProvider):
             )
             return self._parse(await self._client.chat.completions.create(**kwargs))
         except Exception as e:
+            if self._is_reasoning_roundtrip_error(e):
+                try:
+                    repaired = self._repair_messages_for_reasoning_roundtrip(messages)
+                    if repaired != messages:
+                        kwargs = self._build_kwargs(
+                            repaired, tools, model, max_tokens, temperature,
+                            reasoning_effort, tool_choice,
+                        )
+                        return self._parse(await self._client.chat.completions.create(**kwargs))
+                except Exception:
+                    pass
+            # Fallback to streaming for models (like DashScope QwQ/QVQ) that do not support non-streaming calls
+            err_str = str(e).lower()
+            if "does not support http call" in err_str or "does not support synchronous calls" in err_str:
+                try:
+                    return await self.chat_stream(
+                        messages=messages,
+                        tools=tools,
+                        model=model,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        reasoning_effort=reasoning_effort,
+                        tool_choice=tool_choice,
+                        on_content_delta=None,
+                    )
+                except Exception as fallback_e:
+                    return self._handle_error(fallback_e, spec=self._spec, api_base=self.api_base)
             return self._handle_error(e, spec=self._spec, api_base=self.api_base)
 
     async def chat_stream(
@@ -1009,6 +1073,35 @@ class OpenAICompatProvider(LLMProvider):
                 error_kind="timeout",
             )
         except Exception as e:
+            if self._is_reasoning_roundtrip_error(e):
+                try:
+                    repaired = self._repair_messages_for_reasoning_roundtrip(messages)
+                    if repaired != messages:
+                        kwargs = self._build_kwargs(
+                            repaired, tools, model, max_tokens, temperature,
+                            reasoning_effort, tool_choice,
+                        )
+                        kwargs["stream"] = True
+                        kwargs["stream_options"] = {"include_usage": True}
+                        stream = await self._client.chat.completions.create(**kwargs)
+                        chunks: list[Any] = []
+                        stream_iter = stream.__aiter__()
+                        while True:
+                            try:
+                                chunk = await asyncio.wait_for(
+                                    stream_iter.__anext__(),
+                                    timeout=idle_timeout_s,
+                                )
+                            except StopAsyncIteration:
+                                break
+                            chunks.append(chunk)
+                            if on_content_delta and chunk.choices:
+                                text = getattr(chunk.choices[0].delta, "content", None)
+                                if text:
+                                    await on_content_delta(text)
+                        return self._parse_chunks(chunks)
+                except Exception:
+                    pass
             return self._handle_error(e, spec=self._spec, api_base=self.api_base)
 
     def get_default_model(self) -> str:

@@ -18,9 +18,53 @@ from minibot.config.paths import get_media_dir
 _IS_WINDOWS = sys.platform == "win32"
 
 _DEFAULT_ALLOW_PATTERNS = [
-    # Common read-only / diagnostic commands.
-    r"\b(?:echo|cat|head|tail|wc|grep|ls|pwd|printenv|dir|curl|wget|sleep|python|python3)\b",
+    # Common read-only / diagnostic commands (incl. Windows cmd / PowerShell idioms).
+    r"\b(?:echo|cat|head|tail|wc|grep|ls|pwd|printenv|dir|curl|wget|sleep|python|python3|type|more|findstr)\b",
+    r"\bGet-Content\b",
+    r"\bSelect-String\b",
 ]
+
+# Extra exec whitelist entries merged (setdefault) for *subagents only* when the user
+# sets tools.exec.allowedCommands — avoids Windows models failing on Get-Content etc.
+_SUBAGENT_EXTRA_ALLOWED_COMMANDS: dict[str, list[str]] = {
+    # cmd.exe (Windows default shell for ExecTool._spawn)
+    "type": [],
+    "more": [],
+    "findstr": [],
+    # PowerShell-style first token (some models emit these even though cmd is the shell;
+    # cmd may resolve powershell.exe from PATH for chained invocations).
+    "Get-Content": [],
+    "Select-String": [],
+    # Explicit PowerShell launcher: arguments must mention a read-style cmdlet.
+    "powershell": [
+        r"(?i)\bGet-Content\b",
+        r"(?i)\bSelect-String\b",
+        r"(?i)\bGet-ChildItem\b",
+    ],
+    "pwsh": [
+        r"(?i)\bGet-Content\b",
+        r"(?i)\bSelect-String\b",
+        r"(?i)\bGet-ChildItem\b",
+    ],
+}
+
+
+def merge_subagent_exec_allowed_commands(
+    user: dict[str, list[str]] | None,
+) -> dict[str, list[str]] | None:
+    """Extend a user ``allowed_commands`` map with read-only Windows / shell helpers.
+
+    When *user* is ``None``, exec runs without the per-command whitelist (existing
+    behavior). When *user* is set, subagents would otherwise often hit
+    ``Command 'Get-Content' is not in the allowed_commands whitelist``; we only add
+    keys that are **missing** so explicit user entries always win.
+    """
+    if user is None:
+        return None
+    merged: dict[str, list[str]] = {k: list(v) for k, v in user.items()}
+    for cmd, patterns in _SUBAGENT_EXTRA_ALLOWED_COMMANDS.items():
+        merged.setdefault(cmd, list(patterns))
+    return merged
 
 
 @tool_parameters(
@@ -285,6 +329,7 @@ class ExecTool(Tool):
             if re.search(pattern, lower):
                 return "Error: Command blocked by safety guard (dangerous pattern detected)"
 
+        whitelist_mode = self.allowed_commands is not None
         if self.allowed_commands is not None:
             import shlex
             try:
@@ -360,7 +405,10 @@ class ExecTool(Tool):
                 if not matched and patterns:
                     return f"Error: Arguments for command '{cmd_name}' failed validation against allowed patterns"
 
-        if self.allow_patterns:
+        # When the user configured an explicit per-command whitelist, that list is
+        # the gate — do not also require a match against generic allow_patterns
+        # (would reject e.g. Get-Content even after whitelist merge).
+        if self.allow_patterns and not whitelist_mode:
             if not any(re.search(p, lower) for p in self.allow_patterns):
                 return "Error: Command blocked by safety guard (not in allowlist)"
 

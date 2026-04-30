@@ -5,7 +5,9 @@ providers that return a reasoning_content field (e.g. MiMo, DeepSeek-R1).
 """
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from minibot.providers.openai_compat_provider import OpenAICompatProvider
 
@@ -126,3 +128,43 @@ def test_parse_chunks_sdk_reasoning_content_none_when_absent() -> None:
     result = OpenAICompatProvider._parse_chunks(chunks)
 
     assert result.reasoning_content is None
+
+
+@pytest.mark.asyncio
+async def test_chat_retries_once_after_reasoning_roundtrip_error() -> None:
+    """Provider auto-retries with repaired history on reasoning-content errors."""
+    with patch("minibot.providers.openai_compat_provider.AsyncOpenAI"):
+        provider = OpenAICompatProvider()
+
+    class _Err(Exception):
+        def __init__(self, body: str):
+            super().__init__(body)
+            self.body = body
+
+    first_error = _Err("The reasoning_content in the thinking mode must be passed back to the API.")
+    good_response = {
+        "choices": [{
+            "message": {"content": "ok"},
+            "finish_reason": "stop",
+        }],
+    }
+
+    create_mock = AsyncMock(side_effect=[first_error, good_response])
+    provider._client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=create_mock),
+        )
+    )
+
+    messages = [
+        {"role": "user", "content": "u1"},
+        {"role": "assistant", "content": "legacy no reasoning"},
+        {"role": "user", "content": "u2"},
+    ]
+    result = await provider.chat(messages=messages)
+    assert result.content == "ok"
+    assert create_mock.await_count == 2
+    first_messages = create_mock.await_args_list[0].kwargs["messages"]
+    assert len(first_messages) == 3
+    second_messages = create_mock.await_args_list[1].kwargs["messages"]
+    assert all(m.get("role") != "assistant" for m in second_messages)

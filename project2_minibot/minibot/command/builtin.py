@@ -76,8 +76,13 @@ async def cmd_status(ctx: CommandContext) -> OutboundMessage:
         pass  # Never let usage fetch break /status
     active_tasks = loop._active_tasks.get(ctx.key, [])
     task_count = sum(1 for t in active_tasks if not t.done())
+    subagent_count = 0
     try:
-        task_count += loop.subagents.get_running_count_by_session(ctx.key)
+        subagent_count = loop.subagents.get_running_count_by_session(ctx.key)
+    except Exception:
+        pass
+    try:
+        task_count += subagent_count
     except Exception:
         pass
     return OutboundMessage(
@@ -91,6 +96,7 @@ async def cmd_status(ctx: CommandContext) -> OutboundMessage:
             context_tokens_estimate=ctx_est,
             search_usage_text=search_usage_text,
             active_task_count=task_count,
+            subagent_count=subagent_count,
         ),
         metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
     )
@@ -320,6 +326,183 @@ async def cmd_help(ctx: CommandContext) -> OutboundMessage:
     )
 
 
+async def cmd_addagent(ctx: CommandContext) -> OutboundMessage:
+    """Register a persisted subagent in **standby** (duty saved; does not run until /runagent or spawn).
+
+    Usage:
+      /addagent <label> | <duty>
+    """
+    args = ctx.args.strip()
+    if not args or "|" not in args:
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=(
+                "Usage:\n"
+                "/addagent <label> | <duty>\n\n"
+                "<duty> is the subagent's standing role; it is persisted but not executed until you run:\n"
+                "  /runagent <label>  or  /runagent <label> | <one-shot instruction>\n"
+                "or the main agent calls spawn with `from_persisted_label`.\n\n"
+                "Example:\n"
+                "/addagent daily news agent | 收集全球科技前沿资讯并生成日报"
+            ),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    label, task = (part.strip() for part in args.split("|", 1))
+    if not label or not task:
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=(
+                "Invalid format.\n"
+                "You must provide both non-empty label and duty:\n"
+                "/addagent <label> | <duty>"
+            ),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    result = ctx.loop.subagents.register_standby(
+        task=task,
+        label=label,
+        origin_channel=ctx.msg.channel,
+        origin_chat_id=ctx.msg.chat_id,
+        session_key=ctx.key,
+    )
+    return OutboundMessage(
+        channel=ctx.msg.channel,
+        chat_id=ctx.msg.chat_id,
+        content=result,
+        metadata=dict(ctx.msg.metadata or {}),
+    )
+
+
+async def cmd_runagent(ctx: CommandContext) -> OutboundMessage:
+    """Start a persisted standby (or idle) subagent for one execution run.
+
+    Usage:
+      /runagent <label>
+      /runagent <label> | <instruction>
+      /runagent <6-8 hex id>
+    """
+    args = (ctx.args or "").strip()
+    if not args:
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=(
+                "Usage:\n"
+                "/runagent <label>\n"
+                "/runagent <label> | <instruction>\n"
+                "/runagent <id>   (6–8 hex chars if label is ambiguous)\n\n"
+                "Registers created with `/addagent` stay in **standby** until you run this "
+                "(or the main agent uses spawn with `from_persisted_label`)."
+            ),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    if "|" in args:
+        label, instruction = (p.strip() for p in args.split("|", 1))
+    else:
+        label, instruction = args, ""
+
+    if not label:
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content="Usage: /runagent <label> [| instruction]",
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    result = await ctx.loop.subagents.start_persisted(
+        ctx.key,
+        label=label,
+        instruction=instruction or None,
+    )
+    return OutboundMessage(
+        channel=ctx.msg.channel,
+        chat_id=ctx.msg.chat_id,
+        content=result,
+        metadata=dict(ctx.msg.metadata or {}),
+    )
+
+
+def _format_duration_hms(total_seconds: int) -> str:
+    seconds = max(0, int(total_seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+async def cmd_agents(ctx: CommandContext) -> OutboundMessage:
+    """List persisted subagents for the current session (incl. completed); uptime or last run duration."""
+    rows = ctx.loop.subagents.list_agents_for_session(ctx.key)
+    if not rows:
+        pp = ctx.loop.subagents.persistence_path
+        content = (
+            "No subagents in this session. Register with:\n"
+            "/addagent <label> | <duty>\n"
+            f"(Records: `{pp}`.)"
+        )
+    else:
+        lines = [
+            "Subagents (current session; persist until `/deleteagent <label>`):",
+            "status `standby` = duty saved, not running — use `/runagent <label>`.",
+            "",
+        ]
+        for row in rows:
+            st = str(row.get("status") or "?")
+            sec = int(row.get("elapsed_seconds") or 0)
+            rid = str(row.get("id") or "")
+            is_live = ctx.loop.subagents.is_task_running(rid)
+            if is_live or st == "running":
+                time_col = f"uptime `{_format_duration_hms(sec)}`"
+            else:
+                time_col = f"last run `{_format_duration_hms(sec)}`" if sec else "last run `—`"
+            duty = str(row.get("duty") or "")
+            duty_preview = duty if len(duty) <= 120 else duty[:117] + "…"
+            lines.append(
+                f"- id: `{row['id']}` | label: `{row['label']}` | status: `{st}` | {time_col}\n"
+                f"  duty: {duty_preview!r}"
+            )
+        content = "\n".join(lines)
+    return OutboundMessage(
+        channel=ctx.msg.channel,
+        chat_id=ctx.msg.chat_id,
+        content=content,
+        metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+    )
+
+
+async def cmd_deleteagent(ctx: CommandContext) -> OutboundMessage:
+    """Remove persisted subagent(s) by label in this session (cancels if running)."""
+    label = (ctx.args or "").strip()
+    if not label:
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content="Usage: /deleteagent <label>",
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+    removed, cancelled = await ctx.loop.subagents.delete_by_label(ctx.key, label)
+    if not removed:
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=f"No subagent with label `{label}` in this session.",
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+    parts = [f"Removed {removed} subagent(s) for label `{label}`."]
+    if cancelled:
+        parts.append(f"Cancelled {cancelled} in-flight run(s).")
+    return OutboundMessage(
+        channel=ctx.msg.channel,
+        chat_id=ctx.msg.chat_id,
+        content=" ".join(parts),
+        metadata=dict(ctx.msg.metadata or {}),
+    )
+
+
 def build_help_text() -> str:
     """Build canonical help text shared across channels."""
     lines = [
@@ -328,6 +511,10 @@ def build_help_text() -> str:
         "/stop — Stop the current task",
         "/restart — Restart the bot",
         "/status — Show bot status",
+        "/addagent — Register subagent standby (/addagent <label> | <duty>, does not run yet)",
+        "/runagent — Start a persisted subagent (/runagent <label> [| instruction])",
+        "/agents — List subagents + duty (persisted until deleted)",
+        "/deleteagent — Remove subagent(s) by label in current session",
         "/dream — Manually trigger Dream consolidation",
         "/dream-log — Show what the last Dream changed",
         "/dream-restore — Revert memory to a previous state",
@@ -343,6 +530,10 @@ def register_builtin_commands(router: CommandRouter) -> None:
     router.priority("/status", cmd_status)
     router.exact("/new", cmd_new)
     router.exact("/status", cmd_status)
+    router.exact("/agents", cmd_agents)
+    router.prefix("/addagent ", cmd_addagent)
+    router.prefix("/runagent ", cmd_runagent)
+    router.prefix("/deleteagent ", cmd_deleteagent)
     router.exact("/dream", cmd_dream)
     router.exact("/dream-log", cmd_dream_log)
     router.prefix("/dream-log ", cmd_dream_log)

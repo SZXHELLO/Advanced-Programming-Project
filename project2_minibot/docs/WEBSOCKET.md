@@ -106,6 +106,8 @@ All frames are JSON text. Each message has an `event` field.
 
 `media` and `reply_to` are only present when applicable.
 
+ReAct / progress lines (Observation, round trace, etc.) use the same `event` but include **`"kind": "progress"`** (and optionally **`"toolHint": true`** for tool-call hint lines). Web UIs can fold these into a “thinking” panel instead of the main reply thread. User-visible final answers omit `kind` (or use a value other than `progress`).
+
 **`delta`** — streaming text chunk (only when `streaming: true`):
 
 ```json

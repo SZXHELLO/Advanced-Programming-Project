@@ -3,80 +3,36 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
 import json
 from typing import Any
 
 import aiohttp
 from aiohttp import web
 from loguru import logger
-from pydantic import Field, field_validator
 
 from minibot.bus.events import OutboundMessage
 from minibot.bus.queue import MessageBus
+from minibot.channels._onebot_utils import (
+    format_onebot_message_content,
+    verify_gocqhttp_signature,
+)
 from minibot.channels.base import BaseChannel
-from minibot.config.schema import Base
+from minibot.config.schema import QQWebhookConfig, _normalize_webhook_path
 
 
 def _normalize_path(path: str) -> str:
-    if not path:
-        return "/"
-    if not path.startswith("/"):
-        path = "/" + path
-    if len(path) > 1 and path.endswith("/"):
-        return path.rstrip("/")
-    return path
+    """Backward-compatible wrapper kept for tests and external callers."""
+    return _normalize_webhook_path(path)
 
 
 def _verify_gocqhttp_signature(body: bytes, secret: str, header_value: str | None) -> bool:
-    """Validate X-Signature from go-cqhttp post.secret (HMAC-SHA1)."""
-    if not secret:
-        return True
-    if not header_value:
-        return False
-    digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha1).hexdigest()
-    expected = f"sha1={digest}"
-    supplied = header_value.strip().lower()
-    # Some relays may strip the "sha1=" prefix; accept either format.
-    return hmac.compare_digest(supplied, expected) or hmac.compare_digest(supplied, digest)
+    """Backward-compatible wrapper around shared OneBot signature verification."""
+    return verify_gocqhttp_signature(body, secret, header_value)
 
 
 def _format_message_content(message: Any, raw_message: str = "") -> str:
-    """Convert OneBot v11 message payload to plain text."""
-    if isinstance(message, str):
-        return message.strip()
-
-    if isinstance(message, list):
-        parts: list[str] = []
-        placeholders = {
-            "image": "[image]",
-            "record": "[audio]",
-            "video": "[video]",
-            "file": "[file]",
-            "at": "@",
-            "reply": "[reply]",
-            "face": "[emoji]",
-            "json": "[json]",
-            "xml": "[xml]",
-        }
-        for seg in message:
-            if not isinstance(seg, dict):
-                continue
-            seg_type = str(seg.get("type") or "")
-            data = seg.get("data") or {}
-            if seg_type == "text":
-                text = str(data.get("text") or "")
-                if text:
-                    parts.append(text)
-                continue
-            if seg_type in placeholders:
-                parts.append(placeholders[seg_type])
-        text = "".join(parts).strip()
-        if text:
-            return text
-
-    return (raw_message or "").strip()
+    """Backward-compatible wrapper around shared OneBot message formatter."""
+    return format_onebot_message_content(message, raw_message)
 
 
 def _extract_inbound_message(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -102,19 +58,26 @@ def _extract_inbound_message(payload: dict[str, Any]) -> dict[str, Any] | None:
     if not content:
         return None
 
+    mid = payload.get("message_id")
+    metadata: dict[str, Any] = {
+        "qq_webhook": {
+            "message_type": message_type,
+            "message_id": mid,
+            "user_id": payload.get("user_id"),
+            "group_id": payload.get("group_id"),
+            "self_id": payload.get("self_id"),
+        }
+    }
+    # AgentLoop / MessageTool read ``message_id`` at the top level of metadata
+    # for tool context and reply threading — keep it in sync with qq_webhook.
+    if mid is not None:
+        metadata["message_id"] = mid
+
     return {
         "sender_id": user_id,
         "chat_id": chat_id,
         "content": content,
-        "metadata": {
-            "qq_webhook": {
-                "message_type": message_type,
-                "message_id": payload.get("message_id"),
-                "user_id": payload.get("user_id"),
-                "group_id": payload.get("group_id"),
-                "self_id": payload.get("self_id"),
-            }
-        },
+        "metadata": metadata,
     }
 
 
@@ -132,24 +95,6 @@ def _parse_target_chat(chat_id: str) -> tuple[str, str, str]:
     raise ValueError(
         f"qq_webhook chat_id must be 'private:<user_id>' or 'group:<group_id>', got: {chat_id}"
     )
-
-
-class QQWebhookConfig(Base):
-    """go-cqhttp reverse HTTP webhook channel configuration."""
-
-    enabled: bool = False
-    host: str = "127.0.0.1"
-    port: int = 8080
-    path: str = "/qq/webhook"
-    secret: str = ""
-    api_base: str = "http://127.0.0.1:5700"
-    access_token: str = ""
-    allow_from: list[str] = Field(default_factory=lambda: ["*"])
-
-    @field_validator("path")
-    @classmethod
-    def normalize_path(cls, value: str) -> str:
-        return _normalize_path(value)
 
 
 class QQWebhookChannel(BaseChannel):
@@ -225,9 +170,14 @@ class QQWebhookChannel(BaseChannel):
             target_key: target_id,
             "message": content,
         }
-        if msg.reply_to:
+        reply_id = msg.reply_to
+        if not reply_id and msg.metadata:
+            mid = msg.metadata.get("message_id")
+            if mid is not None:
+                reply_id = str(mid).strip()
+        if reply_id:
             payload["auto_escape"] = False
-            payload["message"] = f"[CQ:reply,id={msg.reply_to}]{content}"
+            payload["message"] = f"[CQ:reply,id={reply_id}]{content}"
 
         headers = {"Content-Type": "application/json"}
         token = self.config.access_token.strip()
@@ -235,11 +185,32 @@ class QQWebhookChannel(BaseChannel):
             headers["Authorization"] = f"Bearer {token}"
 
         resp = await self._http.post(url, json=payload, headers=headers)
+        raw_text = (await resp.text())[:2000]
         if resp.status >= 400:
-            detail = (await resp.text())[:500]
             raise RuntimeError(
-                f"qq_webhook send failed status={resp.status} endpoint={endpoint} detail={detail}"
+                f"qq_webhook send failed status={resp.status} endpoint={endpoint} detail={raw_text}"
             )
+        try:
+            data = json.loads(raw_text) if raw_text.strip() else None
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            rc = data.get("retcode")
+            st = str(data.get("status") or "").lower()
+            if rc is not None:
+                try:
+                    rc_int = int(rc)
+                except (TypeError, ValueError):
+                    rc_int = None
+                if rc_int is not None and rc_int != 0:
+                    raise RuntimeError(
+                        f"qq_webhook OneBot API retcode={rc} status={st!r} "
+                        f"endpoint={endpoint} detail={raw_text[:500]}"
+                    )
+            if st and st not in ("ok", "async"):
+                raise RuntimeError(
+                    f"qq_webhook OneBot API status={st!r} endpoint={endpoint} detail={raw_text[:500]}"
+                )
 
     async def _handle_health(self, _request: web.Request) -> web.Response:
         return web.json_response({"status": "ok"})

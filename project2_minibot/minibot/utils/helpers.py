@@ -401,6 +401,7 @@ def build_status_content(
     context_tokens_estimate: int,
     search_usage_text: str | None = None,
     active_task_count: int = 0,
+    subagent_count: int = 0,
 ) -> str:
     """Build a human-readable runtime status snapshot.
     
@@ -435,6 +436,7 @@ def build_status_content(
         f"\U0001f4ac Session: {session_msg_count} messages",
         f"\u23f1 Uptime: {uptime}",
         f"\u26a1 Tasks: {active_task_count} active",
+        f"\U0001f3bf Subagents: {subagent_count} running (this session)",
     ]
     if search_usage_text:
         lines.append(search_usage_text)
